@@ -302,9 +302,6 @@ static float CubeUV[] = {
 static unsigned int cubeIdx[] =
    {0, 1, 2, 0, 2, 3, 7, 6, 4, 4, 6, 5, 1, 5, 6, 1, 6, 2, 0, 3, 7, 0, 7, 4};
 
-
-
-
 static void InitCube() {
    GameModel mod;
    ModelMesh mesh;
@@ -700,7 +697,6 @@ void ReshapeGL (GLFWwindow * window, int width, int height) {
         glViewport (0, 0, (GLsizei)(width), (GLsizei)(height));
 }
 
-
 float p2wx(double in_x) {
   if (g_width > g_height) {
      return g_width / g_height * (2.0 * in_x / g_width - 1.0);
@@ -738,7 +734,6 @@ int w2py(float in_y) {
       return g_height - (in_y+1.0)*g_height/2.0;
    }
 }
-
 
 //the keyboard callback to change the values to the transforms
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
