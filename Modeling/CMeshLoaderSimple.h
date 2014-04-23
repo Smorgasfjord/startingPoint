@@ -1,12 +1,19 @@
 #ifndef _CMESHLOADER_H_
 #define _CMESHLOADER_H_
 
+#ifdef __APPLE__
+#include <cmath>
+#endif
+
+#ifdef __unix__
+#include <math.h>
+#endif
+
 #include <string>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <math.h>
 #include <iomanip>
 #include <streambuf>
 #include <stdlib.h>
@@ -163,13 +170,14 @@ class SBoundingBox {
    SBoundingBox(float x, float y, float z)
        : left(x), right(x), bottom(y), top(y), front(z), back(z) {}
 
-   SBoundingBox & update(float x, float y, float z) {
+   void update(float x, float y, float z) {
       left = left < x ? left : x;
       right = right > x ? right : x;
       top = top > y ? top : y;
       bottom = bottom < y ? bottom : y;
       front = front > z ? front : z;
       back = back < z ? back : z;
+      return;
    }
 
    SVector3 center() {

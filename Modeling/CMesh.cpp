@@ -1,10 +1,18 @@
 #include "CMesh.h"
 
+#ifdef __APPLE__
+#include <cmath>
+#endif
+
+#ifdef __unix__
+#include <math.h>
+#endif
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <math.h>
+
 #include <iomanip>
 #include <string>
 #include <streambuf>

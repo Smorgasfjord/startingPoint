@@ -813,7 +813,7 @@ int main( int argc, char *argv[] ) {
    glfwMakeContextCurrent(window);
     Initialize();
 
-   LoadTexture((char *)"Models/Dargon.bmp", 0);
+   //LoadTexture((char *)"Models/Dargon.bmp", 0);
 
    //test the openGL version
    getGLversion();
