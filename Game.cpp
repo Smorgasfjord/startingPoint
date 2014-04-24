@@ -131,7 +131,7 @@ GLint h_uProjMatrix;
 vec3 rotStart;
 mat4 trackBall;
 int collisions, PLAYER, HAMMER, GROUND;
-float friction = 30.0f;
+float friction = 5.0f;
 
 //every object has one of these -- size() = number of objects
 vector<GameObject> Objects; //name
@@ -462,28 +462,37 @@ void LoadModel(string fName) {
 void InitGeom() {
    InitCube();
    InitGround();
+   LoadMesh("Models/bunny500.m");
+   LoadMesh("Models/tyra_1k.m");
+   //LoadMesh("Models/bunny500.m");
    PLAYER = InitObj(0,2,0,"player",1.0,0);
    InitObj(0,3,0,"light",0.0,0);
    Objects[1].gravityAffected = 0;
-   GROUND = InitObj(1,0,0,"ground",0.0,2);
+   GROUND = InitObj(1,0,0,"grund",0.0,2);
    Objects[GROUND].gravityAffected = 0;
-   LoadMesh("Models/bunny500.m");
-   LoadMesh("Models/tyra_1k.m");
-   InitObj(0,1,0,"thing",5.0,1);
+   InitObj(0,1,0,"thang",5.0,1);
+   InitObj(0,1,0,"thang",5.0,1);
+   InitObj(0,1,0,"thang",5.0,1);
+   InitObj(0,1,0,"thang",5.0,1);
+   InitObj(0,1,0,"thang",5.0,1);
    HAMMER = InitObj(3,1,0,"hommer",5.0,0);
    
    //Positions[3] = vec3(0,0,25.0f);
    //rotateObj(3,0,-90.0f,0.0f);
    lightx = lighty = 10.0f;
-   scaleObj(5,0.5,0.5,0.5f);
+   scaleObj(1,0.5,0.5,0.5f);
    scaleObj(0,1.0,2.0,1.0f);
    rotateObj(4,90.0f,0.0f,90.0f);
    //transObj(0,eyePos.x,eyePos.y,eyePos.z);
    lookAtPoint = Objects[0].state.pos;
    transObj(1,lightx,lighty,0.0);
-   transObj(5,0.0,5.5,0.0f);
+   transObj(4,1.0,2.0,0.0f);
+   transObj(5,2.0,3.5,0.0f);
+   transObj(6,3.0,5.0,0.0f);
+   transObj(7,4.0,6.5,0.0f);
+   transObj(8,5.0,8.0,0.0f);
    transObj(PLAYER,0.0,2.5,0.0f);
-   Objects[5].setVelocity(vec3(0.5,0.5,0.5));
+   //Objects[5].setVelocity(vec3(0.5,0.5,0.5));
 }
 
 /* projection matrix */
@@ -621,33 +630,35 @@ void Initialize ()               // Any GL Init Code
 void Update(double timeStep) {
    vec3 min, max, force;
    map<int,int> dels;
-   Objects[0].state.velocity *= exp(-friction * timeStep);
+   Objects[0].state.velocity *= exp(-friction * (Objects[0].grounded+0.01) * timeStep);
+   if (Objects[PLAYER].state.velocity.y > 0.01) {
+      Objects[PLAYER].grounded = 0;
+   }
+   
+   if (Objects[0].state.pos.y < 0.5) {
+      transObj(PLAYER, 0.0, -Objects[0].state.pos.y + 0.5, 0.0);
+   }
    for (int i = 0; i < Objects.size(); i++) {
       if (length(Objects[i].state.velocity) > 0.0001) {
          Objects[i].update(timeStep);
-         Objects[i].grounded = 0;
          for (int j = 0; j < Objects.size(); j++) {
             if (j != i && Objects[i].collisionGroup != Objects[j].collisionGroup && length(force = Objects[i].checkCollision(Objects[j])) > 0.0001) {
+               
                if (i == HAMMER) {
                   printf("%s collides with %s\n", Objects[i].name.c_str(), Objects[j].name.c_str());
-                  Objects[PLAYER].applyForce(-force * Objects[HAMMER].mass * (float)timeStep * 10.0f);
+                  Objects[PLAYER].applyForce(-force * Objects[HAMMER].mass * (float)timeStep * 5.0f);
                   collisions++;
                }
                else {
-                  Objects[i].update(-timeStep);
                   Objects[i].state.velocity -= force;
                }
+               Objects[i].update(-timeStep);
                if (j == GROUND) {
                   Objects[i].grounded = 1;
                }
                break;
             }
          }
-      }
-   }
-   for (int i = Objects.size() - 1; i >= 0; i--) {
-      if (dels.count(i)) {
-         Objects.erase(Objects.begin() + i);
       }
    }
 }
@@ -737,7 +748,7 @@ int w2py(float in_y) {
 
 //the keyboard callback to change the values to the transforms
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-   float speed = 10.0;
+   float speed = 100.0;
    vec3 temp;
    if (action == GLFW_PRESS || action == GLFW_REPEAT) {
       switch( key ) {
@@ -763,7 +774,10 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
        default:
          temp = Objects[0].state.velocity;
       }
-      Objects[0].setVelocity(temp*vec3(1.0,0.0,1.0));
+      Objects[0].state.velocity+=(temp*vec3(1.0,0.0,1.0));
+      if (length(Objects[0].state.velocity) > 3000.0) {
+         Objects[0].state.velocity-=(temp*vec3(1.0,0.0,1.0));
+      }
       lookAtPoint = Objects[0].state.pos;
       eyePos = lookAtPoint + wBar * g_Camtrans;
 
@@ -808,7 +822,7 @@ int main( int argc, char *argv[] ) {
    glfwMakeContextCurrent(window);
     Initialize();
 
-   //LoadTexture((char *)"Models/Dargon.bmp", 0);
+   LoadTexture((char *)"Models/Dargon.bmp", 0);
 
    //test the openGL version
    getGLversion();
@@ -841,8 +855,11 @@ int main( int argc, char *argv[] ) {
          Objects[obj].setVelocity(vec3((lastTime - inc)*-((float)(inc%4)-1.5), 0.0, (timey - inc)*((float)(inc%8)-3.5)));
       }
 
-      mousePos = Objects[0].state.pos + vec3(currPos[0], currPos[1], 0.0) * -g_Camtrans;
-      move = mousePos - Objects[HAMMER].state.pos;
+      mousePos = vec3(currPos[0], currPos[1], 0.0) * -g_Camtrans;
+      if (length(mousePos) > 3.0) {
+         mousePos *= vec3(3.0) / mousePos;
+      }
+      move = Objects[PLAYER].state.pos + mousePos - Objects[HAMMER].state.pos;
       Objects[HAMMER].setVelocity(move*(float)(1.0/((timey-lastTime)*2.0)));
       Update((timey-lastTime)*2.0);
       lastTime = glfwGetTime();
