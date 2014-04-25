@@ -1,3 +1,6 @@
+#ifndef GLSL_HELPER_H__
+#define GLSL_HELPER_H__
+
 /*
  *  GLSL_helper.h
  *  CSC473
@@ -12,6 +15,7 @@
 #include <OPENGL/gl.h>
 #endif
 #ifdef __unix__
+#include <GL/glew.h>
 #include <GL/glut.h>
 #include <GLFW/glfw3.h>
 #endif
@@ -137,3 +141,5 @@ public:
   }
 };
 
+
+#endif

@@ -1,4 +1,3 @@
-#include "CMesh.h"
 
 #include <iostream>
 #include <fstream>
@@ -8,7 +7,7 @@
 #include <iomanip>
 #include <string>
 #include <streambuf>
-#include "../Rendering/GLSL_helper.h"
+#include "CMesh.h"
 #include "../glm/glm.hpp"
 #include "../glm/gtc/matrix_transform.hpp" //perspective, trans etc
 #include "../glm/gtc/type_ptr.hpp" //value_ptr
