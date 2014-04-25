@@ -2,12 +2,19 @@
 /* Base code for mesh for CPE 471 Rasterizer project */
 /* Reads in an ASCII mesh into stl vectors (stored in CMesh class) */
 /* heavily edited version of I. Dunn's c++ parser - ZJW */
+#ifdef __APPLE__
+#include <cmath>
+#endif
+
+#ifdef __unix__
+#include <math.h>
+#endif
+
 
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <math.h>
 #include <iomanip>
 #include <string>
 #include <streambuf>

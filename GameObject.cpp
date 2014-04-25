@@ -1,3 +1,5 @@
+#ifndef GAME_OBJECT_CPP
+#define GAME_OBJECT_CPP
 
 #include "GameObject.h"
 
@@ -35,14 +37,14 @@ void SetMaterial(int i) {
   glUseProgram(__ShadeProg);
   switch (i) {
     case 0:
-        safe_glUniform3f(__h_uMatAmb, 0.4, 0.2, 0.2);
-        safe_glUniform3f(__h_uMatDif, 0.6, 0.4, 0.4);
-        safe_glUniform3f(__h_uMatSpec, 0.4, 0.3, 0.3);
+        safe_glUniform3f(__h_uMatAmb, 0.4, 0.4, 0.6);
+        safe_glUniform3f(__h_uMatDif, 0.6, 0.6, 0.6);
+        safe_glUniform3f(__h_uMatSpec, 0.4, 0.4, 0.3);
         safe_glUniform1f(__h_uMatShine, 1.0);
         break;
     case 1:
         safe_glUniform3f(__h_uMatAmb, 0.2, 0.2, 0.2);
-        safe_glUniform3f(__h_uMatDif, 0.0, 0.08, 0.5);
+        safe_glUniform3f(__h_uMatDif, 0.2, 0.3, 0.3);
         safe_glUniform3f(__h_uMatSpec, 0.4, 0.4, 0.4);
         safe_glUniform1f(__h_uMatShine, 200.0);
         break;
@@ -217,9 +219,10 @@ void ObjectMesh::render() {
 }
 
 void GameObject::update(double timeStep) {
-   if (!grounded && gravityAffected) {
-      state.velocity += vec3(0.0, -1.0, 0.0);
+   if (!grounded && gravityAffected && timeStep > 0) {
+      state.velocity += vec3(0.0, -20.0, 0.0);
    }
    vec3 mov = state.velocity * (float)timeStep;
    trans(mov.x,mov.y,mov.z);
 }
+#endif

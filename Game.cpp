@@ -10,7 +10,6 @@
 #include <iostream>
 
 #ifdef __APPLE__
-#include "GLUT/glut.h"
 #include <OPENGL/gl.h>
 #endif
 
@@ -48,6 +47,7 @@
 #include <iostream>
 #include <string>
 #include "glm/glm.hpp"
+#include "Platform.h"
 #include "glm/gtc/matrix_transform.hpp" //perspective, trans etc
 #include "glm/gtc/type_ptr.hpp" //value_ptr
 #include "glm/gtx/vector_query.hpp" //
@@ -128,11 +128,16 @@ GLint h_aNormal;
 GLint h_uModelMatrix;
 GLint h_uViewMatrix;
 GLint h_uProjMatrix;
+GLHandles handles;
+
+//Platform
+GameModel platMod;
+vector<Platform> platforms;
 
 vec3 rotStart;
 mat4 trackBall;
 int collisions, PLAYER, HAMMER, GROUND;
-float friction = 30.0f;
+float friction = 5.0f;
 
 //every object has one of these -- size() = number of objects
 vector<GameObject> Objects; //name
@@ -303,9 +308,6 @@ static float CubeUV[] = {
 static unsigned int cubeIdx[] =
    {0, 1, 2, 0, 2, 3, 7, 6, 4, 4, 6, 5, 1, 5, 6, 1, 6, 2, 0, 3, 7, 0, 7, 4};
 
-
-
-
 static void InitCube() {
    GameModel mod;
    ModelMesh mesh;
@@ -331,6 +333,87 @@ static void InitCube() {
    mod.bounds.update(0.5, 0.5, 0.5);
    mod.meshes.push_back(mesh);
    Models.push_back(mod);   
+}
+
+GameModel init_Platform()
+{
+   float Pos[] = {
+      -1, -0.25, 0, //0
+      -1, -0.25, 1, //1
+      1, -0.25, 1,  //2
+      1, -0.25, 0,  //3
+      -1, 0.25, 0,  //4
+      -1, 0.25, 1,  //5
+      1, 0.25, 1,   //6
+      1, 0.25, 0,   //7
+   };
+   
+   unsigned short idx[] =
+   {
+      2, 1, 0, //Bottom face
+      3, 2, 0,
+      4, 5, 6, //top face
+      7, 4, 6,
+      4, 0, 1, //Left
+      5, 4, 1,
+      6, 3, 2, //Right
+      7, 3, 6,
+      5, 2, 1, //Front
+      6, 2, 5,
+      4, 3, 0, //Back
+      7, 3, 4
+   };
+   
+   float Norm[] =
+   {
+      0, 1, 0,
+      0, 1, 0,
+      1, 0, 0,
+      1, 0, 0,
+      0, 0, 1,
+      0, 0, 1, //here
+      0, 1, 0,
+      0, 1, 0,
+      1, 0, 0,
+      1, 0, 0,
+      0, 0, 1,
+      0, 0, 1,
+   };
+   
+   static GLfloat Tex[] = {
+      0, 0,
+      0, 1,
+      1, 0,
+      1, 1
+   };
+   
+   GameModel mod;
+   ModelMesh mesh;
+   
+   mod = GameModel(Model(), 1, "platform");
+   mesh = ModelMesh(0,0,0,0, sizeof(idx)/sizeof(float));
+   mesh.numFaces = 36;
+   
+   glGenBuffers(1, &mesh.posBuffObj);
+   glBindBuffer(GL_ARRAY_BUFFER, mesh.posBuffObj);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(Pos), Pos, GL_STATIC_DRAW);
+   
+   glGenBuffers(1, &mesh.idxBuffObj);
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.idxBuffObj);
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
+   
+   glGenBuffers(1, &mesh.normBuffObj);
+   glBindBuffer(GL_ARRAY_BUFFER, mesh.normBuffObj);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(Norm), Norm, GL_STATIC_DRAW);
+   
+   glGenBuffers(1, &mesh.uvBuffObj);
+   glBindBuffer(GL_ARRAY_BUFFER, mesh.uvBuffObj);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(Tex), Tex, GL_STATIC_DRAW);
+   
+   mod.bounds = SBoundingBox(-1, -0.5, 1);
+   mod.bounds.update(-1, -.5, 1);
+   mod.meshes.push_back(mesh);
+   return mod;
 }
 
 
@@ -408,6 +491,43 @@ int InitObj(int model, int material, int tex, string name, float mass, int cG) {
 
 }*/
 
+//Read in a .lvl file of the given name
+vector<Platform> importLevel(std::string const & fileName)
+{
+   vector<Platform> plats;
+   std::ifstream File;
+	File.open(fileName.c_str());
+   
+   if (! File.is_open())
+	{
+		std::cerr << "Unable to open Level file: " << fileName << std::endl;
+	}
+   
+	while (File)
+	{
+		string ReadString;
+      string pos, size, rot;
+      glm::vec3 position, sizeVec;
+      float rotation;
+		getline(File, ReadString);
+		std::stringstream Stream(ReadString);
+      
+      //Platform data
+      if(ReadString.find("Platform:") != std::string::npos)
+      {
+         getline(File, pos);
+         getline(File, size);
+         getline(File, rot);
+         sscanf(pos.c_str(), "\t%f %f %f\n", &(position.x), &(position.y), &(position.z));
+         sscanf(size.c_str(), "\t%f %f %f\n", &(sizeVec.x), &(sizeVec.y), &(sizeVec.z));
+         sscanf(rot.c_str(), "\t%f\n", &rotation);
+         plats.push_back(Platform(position, sizeVec, rotation, handles, platMod));
+      }
+   }
+   File.close();
+   return plats;
+}
+
 void LoadMesh(string fName) {
    CMesh mesh;
    GameModel mod;
@@ -466,28 +586,40 @@ void LoadModel(string fName) {
 void InitGeom() {
    InitCube();
    InitGround();
+   platMod = init_Platform();
+   platforms = importLevel("mountain.lvl");
+   LoadMesh("Models/bunny500.m");
+   LoadMesh("Models/tyra_1k.m");
+   //LoadMesh("Models/bunny500.m");
    PLAYER = InitObj(0,2,0,"player",1.0,0);
    InitObj(0,3,0,"light",0.0,0);
    Objects[1].gravityAffected = 0;
-   GROUND = InitObj(1,0,0,"ground",0.0,2);
+   GROUND = InitObj(1,0,0,"grund",0.0,2);
    Objects[GROUND].gravityAffected = 0;
-   LoadMesh("Models/bunny500.m");
-   LoadMesh("Models/tyra_1k.m");
-   InitObj(0,1,0,"thing",5.0,1);
+   InitObj(0,1,0,"thang",5.0,1);
+   InitObj(0,1,0,"thang",5.0,1);
+   InitObj(0,1,0,"thang",5.0,1);
+   InitObj(0,1,0,"thang",5.0,1);
+   InitObj(0,1,0,"thang",5.0,1);
    HAMMER = InitObj(3,1,0,"hommer",5.0,0);
    
    //Positions[3] = vec3(0,0,25.0f);
    //rotateObj(3,0,-90.0f,0.0f);
    lightx = lighty = 10.0f;
-   scaleObj(5,0.5,0.5,0.5f);
+   scaleObj(1,0.5,0.5,0.5f);
    scaleObj(0,1.0,2.0,1.0f);
    rotateObj(4,90.0f,0.0f,90.0f);
    //transObj(0,eyePos.x,eyePos.y,eyePos.z);
    lookAtPoint = Objects[0].state.pos;
    transObj(1,lightx,lighty,0.0);
-   transObj(5,0.0,5.5,0.0f);
-   transObj(PLAYER,0.0,2.5,0.0f);
-   Objects[5].setVelocity(vec3(0.5,0.5,0.5));
+   transObj(4,1.0,2.0,0.0f);
+   transObj(5,2.0,3.5,0.0f);
+   transObj(6,3.0,5.0,0.0f);
+   transObj(7,4.0,6.5,0.0f);
+   transObj(8,5.0,8.0,0.0f);
+   transObj(PLAYER, platforms[0].getPos().x, platforms[0].getPos().y, platforms[0].getPos().z);
+   //transObj(PLAYER,0.0,2.5,0.0f);
+   //Objects[5].setVelocity(vec3(0.5,0.5,0.5));
 }
 
 /* projection matrix */
@@ -582,22 +714,34 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
 
    /* get handles to attribute data */
    h_aPosition = safe_glGetAttribLocation(ShadeProg, "aPosition");
+   handles.aPosition = h_aPosition;
    h_aNormal = safe_glGetAttribLocation(ShadeProg, "aNormal");
+   handles.aNormal = h_aNormal;
    h_aColor = safe_glGetAttribLocation(ShadeProg, "aClr");
    h_aUV = safe_glGetAttribLocation(ShadeProg, "aUV");
    h_uTexUnit = safe_glGetUniformLocation(ShadeProg, "uTexUnit");
    h_uProjMatrix = safe_glGetUniformLocation(ShadeProg, "uProjMatrix");
+   handles.uProjMatrix = h_uProjMatrix;
    h_uViewMatrix = safe_glGetUniformLocation(ShadeProg, "uViewMatrix");
+   handles.uViewMatrix = h_uViewMatrix;
    h_uModelMatrix = safe_glGetUniformLocation(ShadeProg, "uModelMatrix");
+   handles.uModelMatrix = h_uModelMatrix;
    h_uInvTrans = safe_glGetUniformLocation(ShadeProg, "uInverseTranspose");
    h_uLightPos = safe_glGetUniformLocation(ShadeProg, "uLightPos");
+   handles.uLightPos = h_uLightPos;
    h_uLightColor = safe_glGetUniformLocation(ShadeProg, "uLColor");
+   handles.uLightColor = h_uLightColor;
    h_uCamPos = safe_glGetUniformLocation(ShadeProg, "uCamPos");
+   handles.uEyePos = h_uCamPos;
    h_uMode = safe_glGetUniformLocation(ShadeProg, "uMode");
    h_uMatAmb = safe_glGetUniformLocation(ShadeProg, "uMat.aColor");
+   handles.uMatAmb = h_uMatAmb;
    h_uMatDif = safe_glGetUniformLocation(ShadeProg, "uMat.dColor");
+   handles.uMatDif = h_uMatDif;
    h_uMatSpec = safe_glGetUniformLocation(ShadeProg, "uMat.sColor");
+   handles.uMatSpec = h_uMatSpec;
    h_uMatShine = safe_glGetUniformLocation(ShadeProg, "uMat.shine");
+   handles.uMatShine = h_uMatShine;
    
    crappyInitFunc(h_uInvTrans,h_uMatAmb,h_uMatDif,h_uMatSpec,h_uMatShine,
          h_aUV,h_uTexUnit,h_aPosition,h_aColor,h_aNormal,h_uModelMatrix,ShadeProg);
@@ -625,33 +769,35 @@ void Initialize ()               // Any GL Init Code
 void Update(double timeStep) {
    vec3 min, max, force;
    map<int,int> dels;
-   Objects[0].state.velocity *= exp(-friction * timeStep);
+   Objects[0].state.velocity *= exp(-friction * (Objects[0].grounded+0.01) * timeStep);
+   if (Objects[PLAYER].state.velocity.y > 0.01) {
+      Objects[PLAYER].grounded = 0;
+   }
+   
+   if (Objects[0].state.pos.y < 0.5) {
+      transObj(PLAYER, 0.0, -Objects[0].state.pos.y + 0.5, 0.0);
+   }
    for (int i = 0; i < Objects.size(); i++) {
       if (length(Objects[i].state.velocity) > 0.0001) {
          Objects[i].update(timeStep);
-         Objects[i].grounded = 0;
          for (int j = 0; j < Objects.size(); j++) {
             if (j != i && Objects[i].collisionGroup != Objects[j].collisionGroup && length(force = Objects[i].checkCollision(Objects[j])) > 0.0001) {
+               
                if (i == HAMMER) {
                   printf("%s collides with %s\n", Objects[i].name.c_str(), Objects[j].name.c_str());
-                  Objects[PLAYER].applyForce(-force * Objects[HAMMER].mass * (float)timeStep * 10.0f);
+                  Objects[PLAYER].applyForce(-force * Objects[HAMMER].mass * (float)timeStep * 5.0f);
                   collisions++;
                }
                else {
-                  Objects[i].update(-timeStep);
                   Objects[i].state.velocity -= force;
                }
+               Objects[i].update(-timeStep);
                if (j == GROUND) {
                   Objects[i].grounded = 1;
                }
                break;
             }
          }
-      }
-   }
-   for (int i = Objects.size() - 1; i >= 0; i--) {
-      if (dels.count(i)) {
-         Objects.erase(Objects.begin() + i);
       }
    }
 }
@@ -689,6 +835,10 @@ void Draw (void)
       Objects[i].draw();
    }
    
+   for (std::vector<Platform>::iterator it = platforms.begin(); it != platforms.end(); ++ it) {
+      it->draw();
+   }
+   
    //disable the shader
    glUseProgram(0);
    glDisable(GL_TEXTURE_2D);
@@ -700,7 +850,6 @@ void ReshapeGL (GLFWwindow * window, int width, int height) {
         g_height = (float)height;
         glViewport (0, 0, (GLsizei)(width), (GLsizei)(height));
 }
-
 
 float p2wx(double in_x) {
   if (g_width > g_height) {
@@ -740,10 +889,9 @@ int w2py(float in_y) {
    }
 }
 
-
 //the keyboard callback to change the values to the transforms
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-   float speed = 10.0;
+   float speed = 100.0;
    vec3 temp;
    if (action == GLFW_PRESS || action == GLFW_REPEAT) {
       switch( key ) {
@@ -766,10 +914,22 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
        case GLFW_KEY_Q: case GLFW_KEY_ESCAPE :
          glfwSetWindowShouldClose(window, GL_TRUE);
          return;
+      case GLFW_KEY_DOWN:
+         g_Camtrans -= 1.0f;
+            cout << "DOWN";
+         SetView();
+         break;
+      case GLFW_KEY_UP:
+         g_Camtrans += 1.0f;
+         SetView();
+         break;
        default:
          temp = Objects[0].state.velocity;
       }
-      Objects[0].setVelocity(temp*vec3(1.0,0.0,1.0));
+      Objects[0].state.velocity+=(temp*vec3(1.0,0.0,1.0));
+      if (length(Objects[0].state.velocity) > 3000.0) {
+         Objects[0].state.velocity-=(temp*vec3(1.0,0.0,1.0));
+      }
       lookAtPoint = Objects[0].state.pos;
       eyePos = lookAtPoint + wBar * g_Camtrans;
 
@@ -824,6 +984,7 @@ int main( int argc, char *argv[] ) {
       return 0;
    }
    InitGeom();
+   
    glfwSetKeyCallback(window, key_callback);
    glfwSetCursorPosCallback(window, Martian);
    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
@@ -847,8 +1008,11 @@ int main( int argc, char *argv[] ) {
          Objects[obj].setVelocity(vec3((lastTime - inc)*-((float)(inc%4)-1.5), 0.0, (timey - inc)*((float)(inc%8)-3.5)));
       }
 
-      mousePos = Objects[0].state.pos + vec3(currPos[0], currPos[1], 0.0) * -g_Camtrans;
-      move = mousePos - Objects[HAMMER].state.pos;
+      mousePos = vec3(currPos[0], currPos[1], 0.0) * -g_Camtrans;
+      if (length(mousePos) > 3.0) {
+         mousePos *= vec3(3.0) / mousePos;
+      }
+      move = Objects[PLAYER].state.pos + mousePos - Objects[HAMMER].state.pos;
       Objects[HAMMER].setVelocity(move*(float)(1.0/((timey-lastTime)*2.0)));
       Update((timey-lastTime)*2.0);
       lastTime = glfwGetTime();
