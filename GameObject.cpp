@@ -1,3 +1,5 @@
+#ifndef GAME_OBJECT_CPP
+#define GAME_OBJECT_CPP
 
 #include "GameObject.h"
 
@@ -223,3 +225,4 @@ void GameObject::update(double timeStep) {
    vec3 mov = state.velocity * (float)timeStep;
    trans(mov.x,mov.y,mov.z);
 }
+#endif

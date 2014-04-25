@@ -10,7 +10,6 @@
 #include <iostream>
 
 #ifdef __APPLE__
-#include "GLUT/glut.h"
 #include <OPENGL/gl.h>
 #endif
 
@@ -47,6 +46,7 @@
 #include <iostream>
 #include <string>
 #include "glm/glm.hpp"
+#include "Platform.h"
 #include "glm/gtc/matrix_transform.hpp" //perspective, trans etc
 #include "glm/gtc/type_ptr.hpp" //value_ptr
 #include "glm/gtx/vector_query.hpp" //
@@ -127,6 +127,11 @@ GLint h_aNormal;
 GLint h_uModelMatrix;
 GLint h_uViewMatrix;
 GLint h_uProjMatrix;
+GLHandles handles;
+
+//Platform
+GameModel platMod;
+vector<Platform> platforms;
 
 vec3 rotStart;
 mat4 trackBall;
@@ -329,6 +334,87 @@ static void InitCube() {
    Models.push_back(mod);   
 }
 
+GameModel init_Platform()
+{
+   float Pos[] = {
+      -1, -0.25, 0, //0
+      -1, -0.25, 1, //1
+      1, -0.25, 1,  //2
+      1, -0.25, 0,  //3
+      -1, 0.25, 0,  //4
+      -1, 0.25, 1,  //5
+      1, 0.25, 1,   //6
+      1, 0.25, 0,   //7
+   };
+   
+   unsigned short idx[] =
+   {
+      2, 1, 0, //Bottom face
+      3, 2, 0,
+      4, 5, 6, //top face
+      7, 4, 6,
+      4, 0, 1, //Left
+      5, 4, 1,
+      6, 3, 2, //Right
+      7, 3, 6,
+      5, 2, 1, //Front
+      6, 2, 5,
+      4, 3, 0, //Back
+      7, 3, 4
+   };
+   
+   float Norm[] =
+   {
+      0, 1, 0,
+      0, 1, 0,
+      1, 0, 0,
+      1, 0, 0,
+      0, 0, 1,
+      0, 0, 1, //here
+      0, 1, 0,
+      0, 1, 0,
+      1, 0, 0,
+      1, 0, 0,
+      0, 0, 1,
+      0, 0, 1,
+   };
+   
+   static GLfloat Tex[] = {
+      0, 0,
+      0, 1,
+      1, 0,
+      1, 1
+   };
+   
+   GameModel mod;
+   ModelMesh mesh;
+   
+   mod = GameModel(Model(), 1, "platform");
+   mesh = ModelMesh(0,0,0,0, sizeof(idx)/sizeof(float));
+   mesh.numFaces = 36;
+   
+   glGenBuffers(1, &mesh.posBuffObj);
+   glBindBuffer(GL_ARRAY_BUFFER, mesh.posBuffObj);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(Pos), Pos, GL_STATIC_DRAW);
+   
+   glGenBuffers(1, &mesh.idxBuffObj);
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.idxBuffObj);
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
+   
+   glGenBuffers(1, &mesh.normBuffObj);
+   glBindBuffer(GL_ARRAY_BUFFER, mesh.normBuffObj);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(Norm), Norm, GL_STATIC_DRAW);
+   
+   glGenBuffers(1, &mesh.uvBuffObj);
+   glBindBuffer(GL_ARRAY_BUFFER, mesh.uvBuffObj);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(Tex), Tex, GL_STATIC_DRAW);
+   
+   mod.bounds = SBoundingBox(-1, -0.5, 1);
+   mod.bounds.update(-1, -.5, 1);
+   mod.meshes.push_back(mesh);
+   return mod;
+}
+
 
 static void InitGround() {
 
@@ -404,6 +490,43 @@ int InitObj(int model, int material, int tex, string name, float mass, int cG) {
 
 }*/
 
+//Read in a .lvl file of the given name
+vector<Platform> importLevel(std::string const & fileName)
+{
+   vector<Platform> plats;
+   std::ifstream File;
+	File.open(fileName.c_str());
+   
+   if (! File.is_open())
+	{
+		std::cerr << "Unable to open Level file: " << fileName << std::endl;
+	}
+   
+	while (File)
+	{
+		string ReadString;
+      string pos, size, rot;
+      glm::vec3 position, sizeVec;
+      float rotation;
+		getline(File, ReadString);
+		std::stringstream Stream(ReadString);
+      
+      //Platform data
+      if(ReadString.find("Platform:") != std::string::npos)
+      {
+         getline(File, pos);
+         getline(File, size);
+         getline(File, rot);
+         sscanf(pos.c_str(), "\t%f %f %f\n", &(position.x), &(position.y), &(position.z));
+         sscanf(size.c_str(), "\t%f %f %f\n", &(sizeVec.x), &(sizeVec.y), &(sizeVec.z));
+         sscanf(rot.c_str(), "\t%f\n", &rotation);
+         plats.push_back(Platform(position, sizeVec, rotation, handles, platMod));
+      }
+   }
+   File.close();
+   return plats;
+}
+
 void LoadMesh(string fName) {
    CMesh mesh;
    GameModel mod;
@@ -462,6 +585,8 @@ void LoadModel(string fName) {
 void InitGeom() {
    InitCube();
    InitGround();
+   platMod = init_Platform();
+   platforms = importLevel("mountain.lvl");
    LoadMesh("Models/bunny500.m");
    LoadMesh("Models/tyra_1k.m");
    //LoadMesh("Models/bunny500.m");
@@ -491,7 +616,8 @@ void InitGeom() {
    transObj(6,3.0,5.0,0.0f);
    transObj(7,4.0,6.5,0.0f);
    transObj(8,5.0,8.0,0.0f);
-   transObj(PLAYER,0.0,2.5,0.0f);
+   transObj(PLAYER, platforms[0].getPos().x, platforms[0].getPos().y, platforms[0].getPos().z);
+   //transObj(PLAYER,0.0,2.5,0.0f);
    //Objects[5].setVelocity(vec3(0.5,0.5,0.5));
 }
 
@@ -587,22 +713,34 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
 
    /* get handles to attribute data */
    h_aPosition = safe_glGetAttribLocation(ShadeProg, "aPosition");
+   handles.aPosition = h_aPosition;
    h_aNormal = safe_glGetAttribLocation(ShadeProg, "aNormal");
+   handles.aNormal = h_aNormal;
    h_aColor = safe_glGetAttribLocation(ShadeProg, "aClr");
    h_aUV = safe_glGetAttribLocation(ShadeProg, "aUV");
    h_uTexUnit = safe_glGetUniformLocation(ShadeProg, "uTexUnit");
    h_uProjMatrix = safe_glGetUniformLocation(ShadeProg, "uProjMatrix");
+   handles.uProjMatrix = h_uProjMatrix;
    h_uViewMatrix = safe_glGetUniformLocation(ShadeProg, "uViewMatrix");
+   handles.uViewMatrix = h_uViewMatrix;
    h_uModelMatrix = safe_glGetUniformLocation(ShadeProg, "uModelMatrix");
+   handles.uModelMatrix = h_uModelMatrix;
    h_uInvTrans = safe_glGetUniformLocation(ShadeProg, "uInverseTranspose");
    h_uLightPos = safe_glGetUniformLocation(ShadeProg, "uLightPos");
+   handles.uLightPos = h_uLightPos;
    h_uLightColor = safe_glGetUniformLocation(ShadeProg, "uLColor");
+   handles.uLightColor = h_uLightColor;
    h_uCamPos = safe_glGetUniformLocation(ShadeProg, "uCamPos");
+   handles.uEyePos = h_uCamPos;
    h_uMode = safe_glGetUniformLocation(ShadeProg, "uMode");
    h_uMatAmb = safe_glGetUniformLocation(ShadeProg, "uMat.aColor");
+   handles.uMatAmb = h_uMatAmb;
    h_uMatDif = safe_glGetUniformLocation(ShadeProg, "uMat.dColor");
+   handles.uMatDif = h_uMatDif;
    h_uMatSpec = safe_glGetUniformLocation(ShadeProg, "uMat.sColor");
+   handles.uMatSpec = h_uMatSpec;
    h_uMatShine = safe_glGetUniformLocation(ShadeProg, "uMat.shine");
+   handles.uMatShine = h_uMatShine;
    
    crappyInitFunc(h_uInvTrans,h_uMatAmb,h_uMatDif,h_uMatSpec,h_uMatShine,
          h_aUV,h_uTexUnit,h_aPosition,h_aColor,h_aNormal,h_uModelMatrix,ShadeProg);
@@ -696,6 +834,10 @@ void Draw (void)
       Objects[i].draw();
    }
    
+   for (std::vector<Platform>::iterator it = platforms.begin(); it != platforms.end(); ++ it) {
+      it->draw();
+   }
+   
    //disable the shader
    glUseProgram(0);
    glDisable(GL_TEXTURE_2D);
@@ -771,6 +913,15 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
        case GLFW_KEY_Q: case GLFW_KEY_ESCAPE :
          glfwSetWindowShouldClose(window, GL_TRUE);
          return;
+      case GLFW_KEY_DOWN:
+         g_Camtrans -= 1.0f;
+            cout << "DOWN";
+         SetView();
+         break;
+      case GLFW_KEY_UP:
+         g_Camtrans += 1.0f;
+         SetView();
+         break;
        default:
          temp = Objects[0].state.velocity;
       }
@@ -832,6 +983,7 @@ int main( int argc, char *argv[] ) {
       return 0;
    }
    InitGeom();
+   
    glfwSetKeyCallback(window, key_callback);
    glfwSetCursorPosCallback(window, Martian);
    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);

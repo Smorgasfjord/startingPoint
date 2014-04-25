@@ -18,6 +18,7 @@
 #endif
 
 #include "Rendering/GLSL_helper.h"
+#include "GLHandles.h"
 #include "Modeling/mesh.h"
 #include "Modeling/CMeshLoaderSimple.h"
 #include <stdlib.h>
@@ -100,6 +101,7 @@ class GameObject {
       int grounded;
       int gravityAffected;
       float mass;
+      GLHandles handles;
 
       GameObject()
       {
