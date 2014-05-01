@@ -17,9 +17,9 @@
 #include "glm/gtx/vector_query.hpp" //
 #endif
 
+#include "GameModel.h"
 #include "Rendering/GLSL_helper.h"
 #include "GLHandles.h"
-#include "Modeling/mesh.h"
 #include "Modeling/CMeshLoaderSimple.h"
 #include <stdlib.h>
 #include <string>
@@ -39,64 +39,55 @@ struct trans_data {
    mat4 transform;
 };
 
-void crappyInitFunc(GLint a,GLint b,GLint c,GLint d,GLint e,GLint f,GLint g,GLint h,GLint i,GLint j,GLint k,int sp);
 void initGameObjState(Transform_t *state);
 void setMaterial(int i, int ShadeProg);
 
 class ObjectMesh {
    public:
-      Transform_t state;
       int meshIdx;
-      int matIdx;
-      int texIdx;
-      int numFaces;
-      GLuint posBuffObj;
-      GLuint idxBuffObj;
-      GLuint uvBuffObj;
-      GLuint normBuffObj;
-      vector<ObjectMesh> children;
+      MeshBufferData buffDat;
 
       ObjectMesh() 
       {
       }
       
-      ObjectMesh(int m, int mat, int tex, int nf, GLuint p, GLuint i, GLuint u, GLuint n) :
+      ObjectMesh(int m, MeshBufferData n) :
          meshIdx(m),
-         matIdx(mat),
-         texIdx(tex),
-         numFaces(nf),
-         posBuffObj(p),
-         idxBuffObj(i),
-         uvBuffObj(u),
-         normBuffObj(n)
+         buffDat(n)
+      {
+      }
+
+      void render(GLHandles handle);
+};
+
+class ObjectNode {
+   public:
+      vector<ObjectMesh> meshes;
+      vector<ObjectNode> children;
+      string name;
+      Transform_t state;
+
+      ObjectNode()
       {
          initGameObjState(&state);
       }
 
-      void render();
-};
-
-class ObjectModel {
-   public:
-      vector<ObjectMesh> meshes;
-      int modelIdx;
-
-      ObjectModel()
+      ObjectNode(string n) :
+        name(n) 
       {
+         initGameObjState(&state);
       }
-
-      ObjectModel(int mi) :
-         modelIdx(mi)
-      {
-      }
+      
+      void initialize(ModelNode *modNod);
+      void render(GLHandles handle, mat4 cumulative);
 };
 
 class GameObject {
    public:
-      ObjectModel model;
+      ObjectNode model;
       string name;
-      Transform_t state;
       SBoundingBox bounds;
+      int modelIdx;
       int collisionGroup;
       int grounded;
       int gravityAffected;
@@ -107,20 +98,22 @@ class GameObject {
       {
       }
 
-      GameObject(SBoundingBox box, float m, vec3 v, string n, int c) :
-         bounds(box),
-         mass(m),
-         name(n),
-         collisionGroup(c)
+      GameObject(string n) :
+         name(n)
       {
-         initGameObjState(&state);
-         state.velocity = v;
          grounded = 0;
          gravityAffected = 1;
+         mass = 1.0;
+         collisionGroup = 0;
       }
-      
+     
+      void initialize(GameModel *gMod, int modIdx, int collGroup, GLHandles handle);
+      void setPhysProps(float mass, int gravAffect);
+      vec3 pos();
+      vec3 vel();
       vec3 checkCollision(GameObject other);
       vec3 applyForce(vec3 force);
+      vec3 addVelocity(vec3 vel);
       vec3 setVelocity(vec3 vel);
       vec3 applyTransform(mat4 tran);
       float scaleMass(float scale);
@@ -128,54 +121,7 @@ class GameObject {
       void rescale(float x, float y, float z);
       void rot(float x, float y, float z);
       void draw();
-      void update(double timeStep);
+      virtual void update(double timeStep);
 };
-
-class ModelMesh {
-   public:
-      GLuint posBuffObj;
-      GLuint idxBuffObj;
-      GLuint uvBuffObj;
-      GLuint normBuffObj;
-      vector<ModelMesh> children;
-      int numFaces;
-
-      ModelMesh() 
-      {
-      }
-
-      ModelMesh(GLuint p, GLuint i, GLuint u, GLuint n, int nf) :
-         posBuffObj(p),
-         idxBuffObj(i),
-         uvBuffObj(u),
-         normBuffObj(n),
-         numFaces(nf)
-      {
-      }
-};
-
-class GameModel {
-   public:
-      vector<ModelMesh> meshes;
-      Model model;
-      int numMeshes;
-      string fname;
-      SBoundingBox bounds;
-
-      GameModel()
-      {
-      }
-
-      GameModel(Model m, int nm, string fn) :
-         model(m),
-         numMeshes(nm),
-         fname(fn)
-      {
-      }
-
-      void updateBounds();
-};
-
-
 
 #endif

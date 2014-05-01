@@ -10,6 +10,7 @@
 #include <iostream>
 
 #ifdef __APPLE__
+#include "GLUT/glut.h"
 #include <OPENGL/gl.h>
 #endif
 
@@ -47,38 +48,19 @@
 #include <iostream>
 #include <string>
 #include "glm/glm.hpp"
-#include "Platform.h"
 #include "glm/gtc/matrix_transform.hpp" //perspective, trans etc
 #include "glm/gtc/type_ptr.hpp" //value_ptr
 #include "glm/gtx/vector_query.hpp" //
-#include "Modeling/CMesh.h"
-#include "Engine/chunks.h"
 #include "GameObject.h"
+#include "GameModel.h"
+#include "Engine/chunks.h"
+#include "Modeling/CMesh.h"
+#include "Platform.h"
+#include "Mountain.h"
+
 
 using namespace glm;
 using namespace std;
-
-/*data structure for the image used for  texture mapping */
-typedef struct Image {
-  unsigned long sizeX;
-  unsigned long sizeY;
-  char *data;
-} Image;
-
-Image *TextureImage;
-
-typedef struct RGB {
-  GLubyte r;
-  GLubyte g;
-  GLubyte b;
-} RGB;
-
-RGB myimage[64][64];
-RGB* g_pixel;
-
-//forward declaration of image loading and texture set-up code
-int ImageLoad(char *filename, Image *image);
-GLvoid LoadTexture(char* image_file, int tex_id);
 
 void transObj(int meshIdx, float x, float y, float z);
 void scaleObj(int meshIdx, float x, float y, float z);
@@ -100,6 +82,8 @@ vec3 uBar;
 vec3 vBar;
 static float g_scale = 1;
 
+GLHandles handles;
+
 int g_mat_id =1;
 int shadeMode=1;
 
@@ -112,32 +96,17 @@ vec3 upVec = vec3(0.0,1.0,0.0);
 static const float g_groundY = -.51;      // y coordinate of the ground
 static const float g_groundSize = 50.0;   // half the ground length
 
-GLint h_uLightPos;
-GLint h_uLightColor;
-GLint h_uCamPos;
-GLint h_uInvTrans;
-GLint h_uMatAmb, h_uMatDif, h_uMatSpec, h_uMatShine;
-GLint h_uMode, h_aUV, h_uTexUnit;
-
-//vector<ArgContainer> stackArgs;
-
-//Handles to the shader data
-GLint h_aPosition;
-GLint h_aColor;
-GLint h_aNormal;
-GLint h_uModelMatrix;
-GLint h_uViewMatrix;
-GLint h_uProjMatrix;
-GLHandles handles;
+int collisions, PLAYER, HAMMER, GROUND;
+float friction = 30.0f;
 
 //Platform
 GameModel platMod;
-vector<Platform> platforms;
+//vector<Platform> platforms;
+//Platform placing;
 
-vec3 rotStart;
-mat4 trackBall;
-int collisions, PLAYER, HAMMER, GROUND;
-float friction = 5.0f;
+//Mountain
+GameModel mountMod;
+//Mountain mount;
 
 //every object has one of these -- size() = number of objects
 vector<GameObject> Objects; //name
@@ -147,371 +116,43 @@ vector<GameModel> Models;
 
 ChunkWorld worl;
 
-//routines to load in a bmp files - must be 2^nx2^m and a 24bit bmp
-GLvoid LoadTexture(char* image_file, int texID) {
-
-  TextureImage = (Image *) malloc(sizeof(Image));
-  if (TextureImage == NULL) {
-    printf("Error allocating space for image");
-    exit(1);
-  }
-  cout << "trying to load " << image_file << endl;
-  if (!ImageLoad(image_file, TextureImage)) {
-    exit(1);
-  }
-  /*  2d texture, level of detail 0 (normal), 3 components (red, green, blue),            */
-  /*  x size from image, y size from image,                                              */
-  /*  border 0 (normal), rgb color data, unsigned byte data, data  */
-  glBindTexture(GL_TEXTURE_2D, texID);
-  glTexImage2D(GL_TEXTURE_2D, 0, 3,
-    TextureImage->sizeX, TextureImage->sizeY,
-    0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage->data);
-  glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); /*  cheap scaling when image bigg*/
-  glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); /*  cheap scaling when image smal*/
-
-}
-
-/* BMP file loader loads a 24-bit bmp file only */
-
-/*
-* getint and getshort are help functions to load the bitmap byte by byte
-*/
-static unsigned int getint(FILE *fp) {
-  int c, c1, c2, c3;
-
-  /*  get 4 bytes */
-  c = getc(fp);
-  c1 = getc(fp);
-  c2 = getc(fp);
-  c3 = getc(fp);
-
-  return ((unsigned int) c) +
-    (((unsigned int) c1) << 8) +
-    (((unsigned int) c2) << 16) +
-    (((unsigned int) c3) << 24);
-}
-
-static unsigned int getshort(FILE *fp){
-  int c, c1;
-
-  /* get 2 bytes*/
-  c = getc(fp);
-  c1 = getc(fp);
-
-  return ((unsigned int) c) + (((unsigned int) c1) << 8);
-}
-
-/*  quick and dirty bitmap loader...for 24 bit bitmaps with 1 plane only.  */
-
-int ImageLoad(char *filename, Image *image) {
-  FILE *file;
-  unsigned long size;                 /*  size of the image in bytes. */
-  unsigned long i;                    /*  standard counter. */
-  unsigned short int planes;          /*  number of planes in image (must be 1)  */
-  unsigned short int bpp;             /*  number of bits per pixel (must be 24) */
-  char temp;                          /*  used to convert bgr to rgb color. */
-
-  /*  make sure the file is there. */
-  if ((file = fopen(filename, "rb"))==NULL) {
-    printf("File Not Found : %s\n",filename);
-    return 0;
-  }
-
-  /*  seek through the bmp header, up to the width height: */
-  fseek(file, 18, SEEK_CUR);
-
-  /*  No 100% errorchecking anymore!!! */
-
-  /*  read the width */    image->sizeX = getint (file);
-
-  /*  read the height */
-  image->sizeY = getint (file);
-
-  /*  calculate the size (assuming 24 bits or 3 bytes per pixel). */
-  size = image->sizeX * image->sizeY * 3;
-
-  /*  read the planes */
-  planes = getshort(file);
-  if (planes != 1) {
-    printf("Planes from %s is not 1: %u\n", filename, planes);
-    return 0;
-  }
-
-  /*  read the bpp */
-  bpp = getshort(file);
-  if (bpp != 24) {
-    printf("Bpp from %s is not 24: %u\n", filename, bpp);
-    return 0;
-  }
-
-  /*  seek past the rest of the bitmap header. */
-  fseek(file, 24, SEEK_CUR);
-
-  /*  read the data.  */
-  image->data = (char *) malloc(size);
-  if (image->data == NULL) {
-    printf("Error allocating memory for color-corrected image data");
-    return 0;
-  }
-
-  if ((i = fread(image->data, size, 1, file)) != 1) {
-    printf("Error reading image data from %s.\n", filename);
-    return 0;
-  }
-
-  for (i=0;i<size;i+=3) { /*  reverse all of the colors. (bgr -> rgb) */
-    temp = image->data[i];
-    image->data[i] = image->data[i+2];
-    image->data[i+2] = temp;
-  }
-
-  fclose(file); /* Close the file and release the filedes */
-
-  /*  we're done. */
-  return 1;
-}
-
-static float CubePos[] = {
-   -0.5, -0.5, -0.5,  //lower back left
-   -0.5, 0.5, -0.5,   //upper back left
-   0.5, 0.5, -0.5,    //upper back right
-   0.5, -0.5, -0.5,   //lower back right
-   -0.5, -0.5, 0.5,   //lower front left
-   -0.5, 0.5, 0.5,    //upper front left
-   0.5, 0.5, 0.5,     //upper front right
-   0.5, -0.5, 0.5     //lower front right
-};
-
-float rootThree = sqrt(3.0);
-static float CubeNorm[] = {
-   -rootThree, -rootThree, -rootThree,  //lower back left
-   -rootThree, rootThree, -rootThree,   //upper back left
-   rootThree, rootThree, -rootThree,    //upper back right
-   rootThree, -rootThree, -rootThree,   //lower back right
-   -rootThree, -rootThree, rootThree,   //lower front left
-   -rootThree, rootThree, rootThree,    //upper front left
-   rootThree, rootThree, rootThree,     //upper front right
-   rootThree, -rootThree, rootThree     //lower front right
-};
-
-static float CubeUV[] = {
-   0.1, 0.1,
-   0.1, 0.2,
-   0.2, 0.1,
-   0.2, 0.2,
-   0.2, 0.3,
-   0.3, 0.2,
-   0.3, 0.3,
-   0.4, 0.4
-};
-
-static unsigned int cubeIdx[] =
-   {0, 1, 2, 0, 2, 3, 7, 6, 4, 4, 6, 5, 1, 5, 6, 1, 6, 2, 0, 3, 7, 0, 7, 4};
-
-static void InitCube() {
-   GameModel mod;
-   ModelMesh mesh;
-   mod = GameModel(Model(), 1, "cuben");
-   mesh = ModelMesh(0,0,0,0,sizeof(cubeIdx)/sizeof(float));
-
-   glGenBuffers(1, &mesh.posBuffObj);
-   glGenBuffers(1, &mesh.normBuffObj);
-   glGenBuffers(1, &mesh.uvBuffObj);
-   glGenBuffers(1, &mesh.idxBuffObj);
-   glBindBuffer(GL_ARRAY_BUFFER, mesh.posBuffObj);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(CubePos), CubePos, GL_STATIC_DRAW);
-
-   glBindBuffer(GL_ARRAY_BUFFER, mesh.normBuffObj);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(CubeNorm), CubeNorm, GL_STATIC_DRAW);
-
-   glBindBuffer(GL_ARRAY_BUFFER, mesh.uvBuffObj);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(CubeUV), CubeUV, GL_STATIC_DRAW);
-
-   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.idxBuffObj);
-   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIdx), cubeIdx, GL_STATIC_DRAW);
-   mod.bounds = SBoundingBox(-0.5, -0.5, -0.5);
-   mod.bounds.update(0.5, 0.5, 0.5);
-   mod.meshes.push_back(mesh);
-   Models.push_back(mod);   
-}
-
-GameModel init_Platform()
-{
-   float Pos[] = {
-      -1, -0.25, 0, //0
-      -1, -0.25, 1, //1
-      1, -0.25, 1,  //2
-      1, -0.25, 0,  //3
-      -1, 0.25, 0,  //4
-      -1, 0.25, 1,  //5
-      1, 0.25, 1,   //6
-      1, 0.25, 0,   //7
-   };
-   
-   unsigned short idx[] =
-   {
-      2, 1, 0, //Bottom face
-      3, 2, 0,
-      4, 5, 6, //top face
-      7, 4, 6,
-      4, 0, 1, //Left
-      5, 4, 1,
-      6, 3, 2, //Right
-      7, 3, 6,
-      5, 2, 1, //Front
-      6, 2, 5,
-      4, 3, 0, //Back
-      7, 3, 4
-   };
-   
-   float Norm[] =
-   {
-      0, 1, 0,
-      0, 1, 0,
-      1, 0, 0,
-      1, 0, 0,
-      0, 0, 1,
-      0, 0, 1, //here
-      0, 1, 0,
-      0, 1, 0,
-      1, 0, 0,
-      1, 0, 0,
-      0, 0, 1,
-      0, 0, 1,
-   };
-   
-   static GLfloat Tex[] = {
-      0, 0,
-      0, 1,
-      1, 0,
-      1, 1
-   };
-   
-   GameModel mod;
-   ModelMesh mesh;
-   
-   mod = GameModel(Model(), 1, "platform");
-   mesh = ModelMesh(0,0,0,0, sizeof(idx)/sizeof(float));
-   mesh.numFaces = 36;
-   
-   glGenBuffers(1, &mesh.posBuffObj);
-   glBindBuffer(GL_ARRAY_BUFFER, mesh.posBuffObj);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(Pos), Pos, GL_STATIC_DRAW);
-   
-   glGenBuffers(1, &mesh.idxBuffObj);
-   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.idxBuffObj);
-   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
-   
-   glGenBuffers(1, &mesh.normBuffObj);
-   glBindBuffer(GL_ARRAY_BUFFER, mesh.normBuffObj);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(Norm), Norm, GL_STATIC_DRAW);
-   
-   glGenBuffers(1, &mesh.uvBuffObj);
-   glBindBuffer(GL_ARRAY_BUFFER, mesh.uvBuffObj);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(Tex), Tex, GL_STATIC_DRAW);
-   
-   mod.bounds = SBoundingBox(-1, -0.5, 1);
-   mod.bounds.update(-1, -.5, 1);
-   mod.meshes.push_back(mesh);
-   return mod;
-}
-
-
-static void InitGround() {
-
-  // A x-z plane at y = g_groundY of dimension [-g_groundSize, g_groundSize]^2
-    float GrndPos[] = {
-    -g_groundSize, g_groundY, -g_groundSize,
-    -g_groundSize, g_groundY,  g_groundSize,
-     g_groundSize, g_groundY,  g_groundSize,
-     g_groundSize, g_groundY, -g_groundSize
-    };
-
-    float GrndNorm[] = {
-     0, 1, 0,
-     0, 1, 0,
-     0, 1, 0,
-     0, 1, 0,
-     0, 1, 0,
-     0, 1, 0
-    };
-
-    float GrndUV[] = {
-       0.0, 0.0,
-       1.0, 0.0,
-       1.0, 1.0,
-       0.0, 1.0
-    };
-
-    unsigned int idx[] = {0, 1, 2, 0, 2, 3};
-   GameModel mod;
-   ModelMesh mesh;
-   mod = GameModel(Model(), 1, "grond");
-   mesh = ModelMesh(0,0,0,0,sizeof(idx)/sizeof(float));
-
-   glGenBuffers(1, &mesh.posBuffObj);
-   glGenBuffers(1, &mesh.normBuffObj);
-   glGenBuffers(1, &mesh.uvBuffObj);
-   glGenBuffers(1, &mesh.idxBuffObj);
-   glBindBuffer(GL_ARRAY_BUFFER, mesh.posBuffObj);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(GrndPos), GrndPos, GL_STATIC_DRAW);
-
-   glBindBuffer(GL_ARRAY_BUFFER, mesh.normBuffObj);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(GrndNorm), GrndNorm, GL_STATIC_DRAW);
-
-   glBindBuffer(GL_ARRAY_BUFFER, mesh.uvBuffObj);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(GrndUV), GrndUV, GL_STATIC_DRAW);
-
-   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.idxBuffObj);
-   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
-
-   mod.bounds = SBoundingBox(-g_groundSize, -0.001, -g_groundSize);
-   mod.bounds.update(g_groundSize, 0.001, g_groundSize);
-   mod.meshes.push_back(mesh);
-   Models.push_back(mod);   
-}
-
 int InitObj(int model, int material, int tex, string name, float mass, int cG) {
    GameObject obj;
-   GameModel *mod = &Models[model];
-   ModelMesh *temp;
-   obj = GameObject(mod->bounds, mass, vec3(0.0), name, cG);
-   obj.model = ObjectModel(model);
-   for (int i = 0; i < mod->numMeshes; i++) {
-      obj.model.meshes.push_back(ObjectMesh(i,material,tex,mod->meshes[i].numFaces,mod->meshes[i].posBuffObj,
-               mod->meshes[i].idxBuffObj,mod->meshes[i].uvBuffObj,mod->meshes[i].normBuffObj));
-   }
+   obj = GameObject(name);
+   obj.initialize(&Models[model],model,cG,handles);
+   obj.setPhysProps(mass,1);
    Objects.push_back(obj);
    return Objects.size() - 1;
 }
 
-/*void MakeBjorn() {
-   LoadModel("Models/cylinder.obj");
-   LoadModel("Models/sphere.obj");
+//Generates a random float within the range min-max
+float randomFloat(float min, float max)
+{
+   return (max - min) * (rand() / (double) RAND_MAX) + min;
+}
 
-}*/
 
 //Read in a .lvl file of the given name
-vector<Platform> importLevel(std::string const & fileName)
+/*vector<Platform> importLevel(std::string const & fileName)
 {
    vector<Platform> plats;
    std::ifstream File;
-	File.open(fileName.c_str());
-   
+   File.open(fileName.c_str());
+
    if (! File.is_open())
-	{
-		std::cerr << "Unable to open Level file: " << fileName << std::endl;
-	}
-   
-	while (File)
-	{
-		string ReadString;
+   {
+      std::cerr << "Unable to open Level file: " << fileName << std::endl;
+   }
+
+   while (File)
+   {
+      string ReadString;
       string pos, size, rot;
       glm::vec3 position, sizeVec;
       float rotation;
-		getline(File, ReadString);
-		std::stringstream Stream(ReadString);
-      
+      getline(File, ReadString);
+      std::stringstream Stream(ReadString);
+
       //Platform data
       if(ReadString.find("Platform:") != std::string::npos)
       {
@@ -528,6 +169,39 @@ vector<Platform> importLevel(std::string const & fileName)
    return plats;
 }
 
+//Export the current platform layout to a .lvl file
+void exportLevel()
+{
+   string fileName = "mountain.lvl";
+   ofstream myfile;
+
+
+   myfile.open ((char*)fileName.c_str());
+   for (std::vector<Platform>::iterator it = platforms.begin(); it != platforms.end(); ++ it) {
+      myfile << it->toString();
+   }
+   myfile.close();
+
+}*/
+
+/* Initialization of objects in the world */
+/*void setWorld()
+{
+   //Add mountain
+   mount = Mountain(glm::vec3(g_groundSize / 2, 0, g_groundSize / 2), handles, mountMod);
+
+   //Read in a level if one is available, we probably want to make
+   //this a more complex system of loading/saving
+   platforms = importLevel("mountain.lvl");
+}*/
+
+
+/*void MakeBjorn() {
+   LoadModel("Models/cylinder.obj");
+   LoadModel("Models/sphere.obj");
+   
+}*/
+/*
 void LoadMesh(string fName) {
    CMesh mesh;
    GameModel mod;
@@ -550,109 +224,56 @@ void LoadMesh(string fName) {
    mod.bounds = mesh.Bounds;
    mod.meshes.push_back(mmesh);
    Models.push_back(mod);
-}
+}*/
 
 void LoadModel(string fName) {
-   Model moddl;
-   int vCount(0), mIdx(0);
    GameModel mod;
-   GLuint idx, pos, uv, norm;
-   SBoundingBox box = SBoundingBox(0.0,0.0,0.0);
-   Face temp;
-   ifstream modelFile(fName.c_str());
-   moddl.load(modelFile);
-   std::cout << "Loading: " << fName << "\n";
-   mod = GameModel(moddl, moddl.meshes().size(), fName);
-   for (int i = 0; i < moddl.meshes().size(); i++) {
-      std::cout << " Loading Mesh " << i << " - " << moddl.meshes()[i].name() << "\n";
-      vCount = moddl.meshes()[i].makeVBO(&idx, &pos, &uv, &norm);
-      mod.meshes.push_back(ModelMesh(pos,idx,uv,norm,vCount));
-      for (int j = 0; j < moddl.meshes()[i].faces().size(); j++) {
-         temp = moddl.meshes()[i].faces()[j];
-         for (int k = 0; k < 3; k++) {
-            box.update(moddl.verts()[temp.V[k].mVertex].x,
-                  moddl.verts()[temp.V[k].mVertex].y,
-                  moddl.verts()[temp.V[k].mVertex].z);
-         }
-      }
-   }
-   mod.bounds = box;
+   mod = loadModel(fName);
    Models.push_back(mod);
+
 }
 
 /* initialize the geomtry (including color)
    Change file name to load a different mesh file
 */
 void InitGeom() {
-   InitCube();
-   InitGround();
-   platMod = init_Platform();
-   platforms = importLevel("mountain.lvl");
-   LoadMesh("Models/bunny500.m");
-   LoadMesh("Models/tyra_1k.m");
-   //LoadMesh("Models/bunny500.m");
+   LoadModel("models/bjorn_hammer.dae");
    PLAYER = InitObj(0,2,0,"player",1.0,0);
-   InitObj(0,3,0,"light",0.0,0);
-   Objects[1].gravityAffected = 0;
-   GROUND = InitObj(1,0,0,"grund",0.0,2);
-   Objects[GROUND].gravityAffected = 0;
-   InitObj(0,1,0,"thang",5.0,1);
-   InitObj(0,1,0,"thang",5.0,1);
-   InitObj(0,1,0,"thang",5.0,1);
-   InitObj(0,1,0,"thang",5.0,1);
-   InitObj(0,1,0,"thang",5.0,1);
-   HAMMER = InitObj(3,1,0,"hommer",5.0,0);
+   //GROUND = InitObj(1,0,0,"ground",0.0,2);
+   //Objects[GROUND].gravityAffected = 0;
+   //InitObj(0,1,0,"thing",5.0,1);
+   //HAMMER = InitObj(3,1,0,"hommer",5.0,0);
    
    //Positions[3] = vec3(0,0,25.0f);
    //rotateObj(3,0,-90.0f,0.0f);
-   lightx = lighty = 10.0f;
-   scaleObj(1,0.5,0.5,0.5f);
-   scaleObj(0,1.0,2.0,1.0f);
-   rotateObj(4,90.0f,0.0f,90.0f);
+   //lightx = lighty = 10.0f;
+   //scaleObj(5,0.5,0.5,0.5f);
+   //scaleObj(0,1.0,2.0,1.0f);
+   //rotateObj(4,90.0f,0.0f,90.0f);
    //transObj(0,eyePos.x,eyePos.y,eyePos.z);
-   lookAtPoint = Objects[0].state.pos;
-   transObj(1,lightx,lighty,0.0);
-   transObj(4,1.0,2.0,0.0f);
-   transObj(5,2.0,3.5,0.0f);
-   transObj(6,3.0,5.0,0.0f);
-   transObj(7,4.0,6.5,0.0f);
-   transObj(8,5.0,8.0,0.0f);
-   transObj(PLAYER, platforms[0].getPos().x, platforms[0].getPos().y, platforms[0].getPos().z);
-   //transObj(PLAYER,0.0,2.5,0.0f);
+   transObj(PLAYER,0.0,2.5,0.0f);
+   lookAtPoint = Objects[0].pos();
+   //transObj(1,lightx,lighty,0.0);
+   //transObj(5,0.0,5.5,0.0f);
    //Objects[5].setVelocity(vec3(0.5,0.5,0.5));
 }
 
 /* projection matrix */
 void SetProjectionMatrix() {
   mat4 Projection = perspective(90.0f, (float)g_width/g_height, 0.1f, 100.f);
-  safe_glUniformMatrix4fv(h_uProjMatrix, value_ptr(Projection));
+  safe_glUniformMatrix4fv(handles.uProjMatrix, value_ptr(Projection));
 }
 
 /* camera controls - do not change */
 void SetView() {
   mat4 view = lookAt(eyePos, lookAtPoint, upVec);
-  safe_glUniformMatrix4fv(h_uViewMatrix, value_ptr(view));
-}
-
-/* model transforms */
-void SetModel(int tIdx) {
-  mat4 Trans = translate( mat4(1.0f), g_trans);
-  mat4 norm = translate( mat4(1.0f), g_trans);
-  if (tIdx >= 0) {
-      safe_glUniformMatrix4fv(h_uModelMatrix, value_ptr((Objects[tIdx].state.transform)));
-      norm = transpose(inverse(Objects[tIdx].state.transform));
-      safe_glUniformMatrix4fv(h_uInvTrans, value_ptr(norm));
-   }
-   else {
-      safe_glUniformMatrix4fv(h_uModelMatrix, value_ptr(Trans));
-      safe_glUniformMatrix4fv(h_uInvTrans, value_ptr(norm));
-   }
+  safe_glUniformMatrix4fv(handles.uViewMatrix, value_ptr(view));
 }
 
 /* set the model transform to the identity */
 void SetModelI() {
   mat4 tmp = mat4(1.0f);
-  safe_glUniformMatrix4fv(h_uModelMatrix, value_ptr(tmp));
+  safe_glUniformMatrix4fv(handles.uModelMatrix, value_ptr(tmp));
 }
 
 void transObj(int meshIdx, float x, float y, float z) {
@@ -672,14 +293,22 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
    GLuint VS; //handles to shader object
    GLuint FS; //handles to frag shader object
    GLint vCompiled, fCompiled, linked; //status of shader
-
+   GLenum err = glewInit();
+   if (GLEW_OK != err)
+   {
+        /* Problem: glewInit failed, something is seriously wrong. */
+        fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+   }
+   cout << "Installing\n";
    VS = glCreateShader(GL_VERTEX_SHADER);
    FS = glCreateShader(GL_FRAGMENT_SHADER);
 
+   cout << "Created\n";
    //load the source
    glShaderSource(VS, 1, &vShaderName, NULL);
    glShaderSource(FS, 1, &fShaderName, NULL);
 
+   cout << "Linked Source\n";
    //compile shader and print log
    glCompileShader(VS);
    /* check shader status requires helper functions */
@@ -703,7 +332,7 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
    ShadeProg = glCreateProgram();
    glAttachShader(ShadeProg, VS);
    glAttachShader(ShadeProg, FS);
-
+   cout << "Attached\n";
    glLinkProgram(ShadeProg);
    /* check shader status requires helper functions */
    printOpenGLError();
@@ -712,39 +341,25 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
 
    glUseProgram(ShadeProg);
 
+   handles = GLHandles();
+   handles.ShadeProg = ShadeProg;
    /* get handles to attribute data */
-   h_aPosition = safe_glGetAttribLocation(ShadeProg, "aPosition");
-   handles.aPosition = h_aPosition;
-   h_aNormal = safe_glGetAttribLocation(ShadeProg, "aNormal");
-   handles.aNormal = h_aNormal;
-   h_aColor = safe_glGetAttribLocation(ShadeProg, "aClr");
-   h_aUV = safe_glGetAttribLocation(ShadeProg, "aUV");
-   h_uTexUnit = safe_glGetUniformLocation(ShadeProg, "uTexUnit");
-   h_uProjMatrix = safe_glGetUniformLocation(ShadeProg, "uProjMatrix");
-   handles.uProjMatrix = h_uProjMatrix;
-   h_uViewMatrix = safe_glGetUniformLocation(ShadeProg, "uViewMatrix");
-   handles.uViewMatrix = h_uViewMatrix;
-   h_uModelMatrix = safe_glGetUniformLocation(ShadeProg, "uModelMatrix");
-   handles.uModelMatrix = h_uModelMatrix;
-   h_uInvTrans = safe_glGetUniformLocation(ShadeProg, "uInverseTranspose");
-   h_uLightPos = safe_glGetUniformLocation(ShadeProg, "uLightPos");
-   handles.uLightPos = h_uLightPos;
-   h_uLightColor = safe_glGetUniformLocation(ShadeProg, "uLColor");
-   handles.uLightColor = h_uLightColor;
-   h_uCamPos = safe_glGetUniformLocation(ShadeProg, "uCamPos");
-   handles.uEyePos = h_uCamPos;
-   h_uMode = safe_glGetUniformLocation(ShadeProg, "uMode");
-   h_uMatAmb = safe_glGetUniformLocation(ShadeProg, "uMat.aColor");
-   handles.uMatAmb = h_uMatAmb;
-   h_uMatDif = safe_glGetUniformLocation(ShadeProg, "uMat.dColor");
-   handles.uMatDif = h_uMatDif;
-   h_uMatSpec = safe_glGetUniformLocation(ShadeProg, "uMat.sColor");
-   handles.uMatSpec = h_uMatSpec;
-   h_uMatShine = safe_glGetUniformLocation(ShadeProg, "uMat.shine");
-   handles.uMatShine = h_uMatShine;
-   
-   crappyInitFunc(h_uInvTrans,h_uMatAmb,h_uMatDif,h_uMatSpec,h_uMatShine,
-         h_aUV,h_uTexUnit,h_aPosition,h_aColor,h_aNormal,h_uModelMatrix,ShadeProg);
+   handles.aPosition = safe_glGetAttribLocation(ShadeProg, "aPosition");
+   handles.aNormal = safe_glGetAttribLocation(ShadeProg, "aNormal");
+   handles.aUV = safe_glGetAttribLocation(ShadeProg, "aUV");
+   handles.uTexUnit = safe_glGetUniformLocation(ShadeProg, "uTexUnit");
+   handles.uProjMatrix = safe_glGetUniformLocation(ShadeProg, "uProjMatrix");
+   handles.uViewMatrix = safe_glGetUniformLocation(ShadeProg, "uViewMatrix");
+   handles.uModelMatrix = safe_glGetUniformLocation(ShadeProg, "uModelMatrix");
+   handles.uNormMatrix = safe_glGetUniformLocation(ShadeProg, "uInverseTranspose");
+   handles.uLightPos = safe_glGetUniformLocation(ShadeProg, "uLightPos");
+   handles.uLightColor = safe_glGetUniformLocation(ShadeProg, "uLColor");
+   handles.uEyePos = safe_glGetUniformLocation(ShadeProg, "uCamPos");
+   handles.uMatAmb = safe_glGetUniformLocation(ShadeProg, "uMat.aColor");
+   handles.uMatDif = safe_glGetUniformLocation(ShadeProg, "uMat.dColor");
+   handles.uMatSpec = safe_glGetUniformLocation(ShadeProg, "uMat.sColor");
+   handles.uMatShine = safe_glGetUniformLocation(ShadeProg, "uMat.shine");
+
    printf("sucessfully installed shader %d\n", ShadeProg);
    return 1;
 }
@@ -768,30 +383,22 @@ void Initialize ()               // Any GL Init Code
 
 void Update(double timeStep) {
    vec3 min, max, force;
-   map<int,int> dels;
-   Objects[0].state.velocity *= exp(-friction * (Objects[0].grounded+0.01) * timeStep);
-   if (Objects[PLAYER].state.velocity.y > 0.01) {
-      Objects[PLAYER].grounded = 0;
-   }
-   
-   if (Objects[0].state.pos.y < 0.5) {
-      transObj(PLAYER, 0.0, -Objects[0].state.pos.y + 0.5, 0.0);
-   }
+   Objects[0].model.state.velocity *= exp(-friction * timeStep);
    for (int i = 0; i < Objects.size(); i++) {
-      if (length(Objects[i].state.velocity) > 0.0001) {
+      if (length(Objects[i].vel()) > 0.0001) {
          Objects[i].update(timeStep);
+         Objects[i].grounded = 0;
          for (int j = 0; j < Objects.size(); j++) {
             if (j != i && Objects[i].collisionGroup != Objects[j].collisionGroup && length(force = Objects[i].checkCollision(Objects[j])) > 0.0001) {
-               
                if (i == HAMMER) {
                   printf("%s collides with %s\n", Objects[i].name.c_str(), Objects[j].name.c_str());
-                  Objects[PLAYER].applyForce(-force * Objects[HAMMER].mass * (float)timeStep * 5.0f);
+                  Objects[PLAYER].applyForce(-force * Objects[HAMMER].mass * (float)timeStep * 10.0f);
                   collisions++;
                }
                else {
-                  Objects[i].state.velocity -= force;
+                  Objects[i].update(-timeStep);
+                  Objects[i].addVelocity(-force);
                }
-               Objects[i].update(-timeStep);
                if (j == GROUND) {
                   Objects[i].grounded = 1;
                }
@@ -816,18 +423,17 @@ void Draw (void)
    SetView();
    //SetModel(-1);
 
-   safe_glUniform1i(h_uMode, shadeMode);
-   safe_glUniform3f(h_uLightPos, lightx,lighty,lightz);
+   safe_glUniform3f(handles.uLightPos, lightx,lighty,lightz);
    //Objects[LIGHTIDX].state.transform = translate(mat4(1.0f), vec3(lightx,lighty,lightz))*microScale;
-   safe_glUniform3f(h_uLightColor, 1.0,1.0,1.0);
-   safe_glUniform3f(h_uCamPos, eyePos.x,eyePos.y,eyePos.z);
+   safe_glUniform3f(handles.uLightColor, 1.0,1.0,1.0);
+   safe_glUniform3f(handles.uEyePos, eyePos.x,eyePos.y,eyePos.z);
 
     //set up the texture unit
     glEnable(GL_TEXTURE_2D);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    safe_glUniform1i(h_uTexUnit, 0);
+    safe_glUniform1i(handles.uTexUnit, 0);
 
     //printf("%d\n", Objects.size());
       //data set up to access the vertices and color
@@ -835,10 +441,19 @@ void Draw (void)
       Objects[i].draw();
    }
    
-   for (std::vector<Platform>::iterator it = platforms.begin(); it != platforms.end(); ++ it) {
+   //mount.draw();
+
+   /*glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+   if(placeMode)
+   {
+      SetMaterial(2);
+      placing.draw();
+   }*/
+
+   /*for (vector<Platform>::iterator it = platforms.begin(); it != platforms.end(); ++ it) {
       it->draw();
-   }
-   
+   }*/
+
    //disable the shader
    glUseProgram(0);
    glDisable(GL_TEXTURE_2D);
@@ -850,6 +465,7 @@ void ReshapeGL (GLFWwindow * window, int width, int height) {
         g_height = (float)height;
         glViewport (0, 0, (GLsizei)(width), (GLsizei)(height));
 }
+
 
 float p2wx(double in_x) {
   if (g_width > g_height) {
@@ -889,9 +505,10 @@ int w2py(float in_y) {
    }
 }
 
+
 //the keyboard callback to change the values to the transforms
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-   float speed = 100.0;
+   float speed = 10.0;
    vec3 temp;
    if (action == GLFW_PRESS || action == GLFW_REPEAT) {
       switch( key ) {
@@ -914,23 +531,11 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
        case GLFW_KEY_Q: case GLFW_KEY_ESCAPE :
          glfwSetWindowShouldClose(window, GL_TRUE);
          return;
-      case GLFW_KEY_DOWN:
-         g_Camtrans -= 1.0f;
-            cout << "DOWN";
-         SetView();
-         break;
-      case GLFW_KEY_UP:
-         g_Camtrans += 1.0f;
-         SetView();
-         break;
        default:
-         temp = Objects[0].state.velocity;
+         temp = Objects[0].vel();
       }
-      Objects[0].state.velocity+=(temp*vec3(1.0,0.0,1.0));
-      if (length(Objects[0].state.velocity) > 3000.0) {
-         Objects[0].state.velocity-=(temp*vec3(1.0,0.0,1.0));
-      }
-      lookAtPoint = Objects[0].state.pos;
+      Objects[0].setVelocity(temp*vec3(1.0,0.0,1.0));
+      lookAtPoint = Objects[0].pos();
       eyePos = lookAtPoint + wBar * g_Camtrans;
 
       wBar = normalize(lookAtPoint-eyePos);
@@ -972,9 +577,13 @@ int main( int argc, char *argv[] ) {
       exit(EXIT_FAILURE);
    }
    glfwMakeContextCurrent(window);
-    Initialize();
-
-   LoadTexture((char *)"Models/Dargon.bmp", 0);
+glewExperimental = GL_TRUE; 
+glewInit();
+   if( !GLEW_VERSION_3_3 )
+{
+    fprintf(stderr, "Insuffcient GL version!%s\n", glGetString(GL_VERSION));
+    return -1;
+}
 
    //test the openGL version
    getGLversion();
@@ -983,8 +592,8 @@ int main( int argc, char *argv[] ) {
       printf("Error installing shader!\n");
       return 0;
    }
+    Initialize();
    InitGeom();
-   
    glfwSetKeyCallback(window, key_callback);
    glfwSetCursorPosCallback(window, Martian);
    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
@@ -1001,23 +610,13 @@ int main( int argc, char *argv[] ) {
       glfwGetFramebufferSize(window, &width, &height);
       inc = (int)timey;
       timey = glfwGetTime();
-      if (inc < (int)timey) {
-         obj = InitObj(2,0,0,"spawm",50.0, 1);
-         transObj(obj,(float)(inc%7),0.0,(float)(inc%5));
-         scaleObj(obj,0.05,0.05,0.05);
-         Objects[obj].setVelocity(vec3((lastTime - inc)*-((float)(inc%4)-1.5), 0.0, (timey - inc)*((float)(inc%8)-3.5)));
-      }
-
-      mousePos = vec3(currPos[0], currPos[1], 0.0) * -g_Camtrans;
-      if (length(mousePos) > 3.0) {
-         mousePos *= vec3(3.0) / mousePos;
-      }
-      move = Objects[PLAYER].state.pos + mousePos - Objects[HAMMER].state.pos;
+      mousePos = Objects[0].pos() + vec3(currPos[0], currPos[1], 0.0) * -g_Camtrans;
+      move = mousePos - Objects[HAMMER].pos();
       Objects[HAMMER].setVelocity(move*(float)(1.0/((timey-lastTime)*2.0)));
       Update((timey-lastTime)*2.0);
       lastTime = glfwGetTime();
       glViewport(0, 0, width, height);
-      lookAtPoint = Objects[0].state.pos;
+      lookAtPoint = Objects[0].pos();
       eyePos = lookAtPoint + wBar * g_Camtrans;
 
       wBar = normalize(lookAtPoint-eyePos);

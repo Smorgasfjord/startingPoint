@@ -15,22 +15,34 @@
 #include <OPENGL/gl.h>
 #endif
 
+#ifdef __unix__
+#include <GL/glew.h>
+#include <GL/glut.h>
+#endif
+
 class GLHandles
 {
    public:
-      GLint aPosition;
-      GLint aNormal;
-      GLint uModelMatrix;
-      GLint uViewMatrix;
-      GLint uProjMatrix;
-      GLint uNormMatrix;
-      GLint uLightPos;
-      GLint uLightColor;
-      GLint uEyePos;
-      GLint uMatAmb;
-      GLint uMatDif;
-      GLint uMatSpec;
-      GLint uMatShine;
+      int ShadeProg;
+      GLuint aPosition;
+      GLuint aNormal;
+      GLuint aUV;
+      GLuint uTexUnit;
+      GLuint uModelMatrix;
+      GLuint uViewMatrix;
+      GLuint uProjMatrix;
+      GLuint uNormMatrix;
+      GLuint uLightPos;
+      GLuint uLightColor;
+      GLuint uEyePos;
+      GLuint uMatAmb;
+      GLuint uMatDif;
+      GLuint uMatSpec;
+      GLuint uMatShine;
+
+      GLHandles()
+      {
+      }
 };
 
 #endif /* defined(___76_Lab1__GLHandles__) */

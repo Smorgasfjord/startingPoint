@@ -5,62 +5,35 @@
 
 using namespace glm;
 
-GLint __h_uInvTrans;
-GLint __h_uMatAmb, __h_uMatDif, __h_uMatSpec, __h_uMatShine;
-GLint __h_aUV, __h_uTexUnit;
-
-//Handles to the shader data
-GLint __h_aPosition;
-GLint __h_aColor;
-GLint __h_aNormal;
-GLint __h_uModelMatrix;
-int __ShadeProg;
-
-void crappyInitFunc(GLint it, GLint ma, GLint md, GLint ms, GLint msh, GLint uv, 
-      GLint tu, GLint pos, GLint c, GLint n, GLint mm, int sp) {
-   __h_uInvTrans = it;
-   __h_uMatAmb = ma;
-   __h_uMatDif = md;
-   __h_uMatSpec = ms;
-   __h_uMatShine = msh;
-   __h_aUV = uv;
-   __h_aPosition = pos;
-   __h_aColor = c;
-   __h_aNormal = n;
-   __h_uModelMatrix = mm;
-   __h_uTexUnit = tu;
-   __ShadeProg = sp;
-}
-
 /* helper function to set up material for shading */
-void SetMaterial(int i) {
-  glUseProgram(__ShadeProg);
+void SetMaterial(int i, int ShadeProg, GLHandles handle) {
+  glUseProgram(ShadeProg);
   switch (i) {
     case 0:
-        safe_glUniform3f(__h_uMatAmb, 0.4, 0.4, 0.6);
-        safe_glUniform3f(__h_uMatDif, 0.6, 0.6, 0.6);
-        safe_glUniform3f(__h_uMatSpec, 0.4, 0.4, 0.3);
-        safe_glUniform1f(__h_uMatShine, 1.0);
+        safe_glUniform3f(handle.uMatAmb, 0.4, 0.4, 0.6);
+        safe_glUniform3f(handle.uMatDif, 0.6, 0.6, 0.6);
+        safe_glUniform3f(handle.uMatSpec, 0.4, 0.4, 0.3);
+        safe_glUniform1f(handle.uMatShine, 1.0);
         break;
     case 1:
-        safe_glUniform3f(__h_uMatAmb, 0.2, 0.2, 0.2);
-        safe_glUniform3f(__h_uMatDif, 0.2, 0.3, 0.3);
-        safe_glUniform3f(__h_uMatSpec, 0.4, 0.4, 0.4);
-        safe_glUniform1f(__h_uMatShine, 200.0);
+        safe_glUniform3f(handle.uMatAmb, 0.2, 0.2, 0.2);
+        safe_glUniform3f(handle.uMatDif, 0.2, 0.3, 0.3);
+        safe_glUniform3f(handle.uMatSpec, 0.4, 0.4, 0.4);
+        safe_glUniform1f(handle.uMatShine, 200.0);
         break;
     case 2:
     /* TO DO fill in another material that is greenish */
         //slime cube
-        safe_glUniform3f(__h_uMatAmb, 0.1, 0.7, 0.1);
-        safe_glUniform3f(__h_uMatDif, 0.3, 0.4, 0.3);
-        safe_glUniform3f(__h_uMatSpec, 0.3, 0.5, 0.3);
-        safe_glUniform1f(__h_uMatShine, 10.0);
+        safe_glUniform3f(handle.uMatAmb, 0.1, 0.7, 0.1);
+        safe_glUniform3f(handle.uMatDif, 0.3, 0.4, 0.3);
+        safe_glUniform3f(handle.uMatSpec, 0.3, 0.5, 0.3);
+        safe_glUniform1f(handle.uMatShine, 10.0);
         break;
     case 3:
-        safe_glUniform3f(__h_uMatAmb, 0.1, 0.1, 0.1);
-        safe_glUniform3f(__h_uMatDif, 0.2, 0.2, 0.2);
-        safe_glUniform3f(__h_uMatSpec, 0.3, 0.3, 0.3);
-        safe_glUniform1f(__h_uMatShine, 20.0);
+        safe_glUniform3f(handle.uMatAmb, 0.1, 0.1, 0.1);
+        safe_glUniform3f(handle.uMatDif, 0.2, 0.2, 0.2);
+        safe_glUniform3f(handle.uMatSpec, 0.3, 0.3, 0.3);
+        safe_glUniform1f(handle.uMatShine, 20.0);
         break;
   }
 }
@@ -77,20 +50,28 @@ bool containedIn(vec3 pt, vec3 min, vec3 max) {
           && pt.x <= max.x && pt.y <= max.y && pt.z <= max.z;
 }
 
+vec3 GameObject::pos() {
+   return model.state.pos;
+}
+
+vec3 GameObject::vel() {
+   return model.state.velocity;
+}
+
 void GameObject::trans(float x, float y, float z) {
    int i;
    mat4 inmesh, *outmesh;
    vec4 newPos;
 
-   state.pos.x += x;
-   state.pos.y += y;
-   state.pos.z += z;
+   model.state.pos.x += x;
+   model.state.pos.y += y;
+   model.state.pos.z += z;
 
-   inmesh = state.translate;
-   outmesh = &state.translate;
+   inmesh = model.state.translate;
+   outmesh = &model.state.translate;
 
    *outmesh = inmesh * translate(mat4(1.0f), vec3(x,y,z));
-   state.transform = (*outmesh) * state.rotation * state.scaling;
+   model.state.transform = (*outmesh) * model.state.rotation * model.state.scaling;
 }
 
 void GameObject::rot(float x, float y, float z) {
@@ -99,9 +80,9 @@ void GameObject::rot(float x, float y, float z) {
    vec4 newPos;
    mat4 movTrans, rotTrans, retTrans, inmesh, *outmesh;
 
-   center = state.pos;
-   inmesh = state.rotation;
-   outmesh = &state.rotation;
+   center = model.state.pos;
+   inmesh = model.state.rotation;
+   outmesh = &model.state.rotation;
 
 //   updateRotation(x,y);
    movTrans = translate(mat4(1.0f), -center);
@@ -111,7 +92,7 @@ void GameObject::rot(float x, float y, float z) {
    rotTrans = rotate(mat4(1.0f), z, vec3(0.0f, 0.0f, 1.0f))*rotTrans;
    *outmesh = retTrans * rotTrans * movTrans * inmesh;
 
-   state.transform = state.translate * (*outmesh) * state.scaling;
+   model.state.transform = model.state.translate * (*outmesh) * model.state.scaling;
 }
 
 void GameObject::rescale(float x, float y, float z) {
@@ -120,17 +101,17 @@ void GameObject::rescale(float x, float y, float z) {
    vec4 newPos;
    mat4 movTrans, sTrans, retTrans, inmesh, *outmesh;
    SBoundingBox temp;
-   center = state.pos;
+   center = model.state.pos;
    vScale = vec3(x,y,z);
-   currScale = state.scale;
+   currScale = model.state.scale;
 
-   inmesh = state.scaling;
-   outmesh = &state.scaling;
+   inmesh = model.state.scaling;
+   outmesh = &model.state.scaling;
    
    movTrans = translate(mat4(1.0f), -center);
    retTrans = translate(mat4(1.0f), center);
    *outmesh = retTrans * scale(mat4(1.0f), vScale) * movTrans * inmesh;
-   state.transform = state.translate * state.rotation * (*outmesh);
+   model.state.transform = model.state.translate * model.state.rotation * (*outmesh);
 
    currScale.x *= vScale.x;
    currScale.y *= vScale.y;
@@ -140,16 +121,20 @@ void GameObject::rescale(float x, float y, float z) {
    bounds = temp;
 }
 
+void GameObject::setPhysProps(float mass, int gravAffect) {
+   this->mass = mass;
+   this->gravityAffected = gravAffect;
+}
 
 vec3 GameObject::checkCollision(GameObject other) {
-   vec3 min = vec3(bounds.left, bounds.bottom, bounds.back) + state.pos;
-   vec3 max = vec3(bounds.right, bounds.top, bounds.front) + state.pos;
-   vec3 otherMin = vec3(other.bounds.left, other.bounds.bottom, other.bounds.back) + other.state.pos;
-   vec3 otherMax = vec3(other.bounds.right, other.bounds.top, other.bounds.front) + other.state.pos;
+   vec3 min = vec3(bounds.left, bounds.bottom, bounds.back) + model.state.pos;
+   vec3 max = vec3(bounds.right, bounds.top, bounds.front) + model.state.pos;
+   vec3 otherMin = vec3(other.bounds.left, other.bounds.bottom, other.bounds.back) + other.model.state.pos;
+   vec3 otherMax = vec3(other.bounds.right, other.bounds.top, other.bounds.front) + other.model.state.pos;
 
    if (max.x > otherMin.x && min.x < otherMax.x && max.y > otherMin.y && 
          min.y < otherMax.y && max.z > otherMin.z && min.z < otherMax.z) {
-      return state.velocity - other.state.velocity;
+      return model.state.velocity - other.model.state.velocity;
    }
 
    return vec3(0.0);
@@ -157,19 +142,25 @@ vec3 GameObject::checkCollision(GameObject other) {
 
 vec3 GameObject::applyForce(vec3 force) {
    vec3 deltaV;
-   state.velocity += force / mass;
+   model.state.velocity += force / mass;
    return deltaV;
+}
+
+vec3 GameObject::addVelocity(vec3 vel) {
+   vec3 forceApplied;
+   model.state.velocity += vel;
+   return forceApplied;
 }
 
 vec3 GameObject::setVelocity(vec3 vel) {
    vec3 forceApplied;
-   state.velocity = vel;
+   model.state.velocity = vel;
    return forceApplied;
 }
 
 vec3 GameObject::applyTransform(mat4 tran) {
    vec3 forceApplied;
-   state.transform *= tran;
+   model.state.transform *= tran;
    return forceApplied;
 }
 
@@ -177,52 +168,70 @@ float GameObject::scaleMass(float scale) {
    return 1.0;
 }
 
-void GameObject::draw() {
-   int i;
-   glUseProgram(__ShadeProg);
-   safe_glUniformMatrix4fv(__h_uModelMatrix, glm::value_ptr(state.transform));
-   safe_glUniformMatrix4fv(__h_uInvTrans, 
-      glm::value_ptr(glm::transpose(glm::inverse(state.transform))));
-
-   for (i = 0; i < model.meshes.size(); i++) {
-      model.meshes[i].render();
+void ObjectNode::initialize(ModelNode *modNod) {
+   ObjectMesh mesh;
+   ObjectNode nod;
+   for (int i = 0; i < modNod->meshes.size(); i++) {
+      mesh = ObjectMesh(i, modNod->meshes[i].buffDat);
+      meshes.push_back(mesh);
    }
+   for (int j = 0; j < modNod->children.size(); j++) {
+      nod = ObjectNode(modNod->name);
+      nod.initialize(&modNod->children[j]);
+      children.push_back(nod);
+   }
+   state.transform = modNod->transform;
 }
 
-void ObjectMesh::render() {
+void GameObject::initialize(GameModel *model, int modIdx, int collGroup, GLHandles handles) {
+   ObjectNode nod;
+   this->handles = handles;
+   this->collisionGroup = collGroup;
+   this->modelIdx = modIdx;
+   nod = ObjectNode(model->rootNode.name);
+   nod.initialize(&model->rootNode);
+   this->model = nod;
+}
+
+void GameObject::draw() {
+   int i;
+   glUseProgram(handles.ShadeProg);
+
+   model.render(handles, mat4(1.0f));
+}
+
+void ObjectNode::render(GLHandles handle, mat4 cumulative) {
+   mat4 current = state.transform * cumulative;
+   safe_glUniformMatrix4fv(handle.uModelMatrix, glm::value_ptr(current));
+   safe_glUniformMatrix4fv(handle.uNormMatrix, 
+      glm::value_ptr(glm::transpose(glm::inverse(current))));
+
+   for (int i = 0; i < meshes.size(); i++) {
+      meshes[i].render(handle);
+   }
+
+   for (int j = 0; j < children.size(); j++) {
+      children[j].render(handle, current);
+   }
+
+}
+
+void ObjectMesh::render(GLHandles handle) {
    //std::cout << "using buffer " << buff << "\n";
-   glUseProgram(__ShadeProg);
-   SetMaterial(matIdx);
-   safe_glEnableVertexAttribArray(__h_aPosition);
-   glBindBuffer(GL_ARRAY_BUFFER, posBuffObj);
-   safe_glVertexAttribPointer(__h_aPosition, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-   safe_glEnableVertexAttribArray(__h_aNormal);
-   glBindBuffer(GL_ARRAY_BUFFER, normBuffObj);
-   safe_glVertexAttribPointer(__h_aNormal, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-   safe_glEnableVertexAttribArray(__h_aUV);
-   //if (shadeMode) {
-   glBindBuffer(GL_ARRAY_BUFFER, uvBuffObj);
-   //}
-   safe_glVertexAttribPointer(__h_aUV, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
+   glUseProgram(handle.ShadeProg);
+   glBindVertexArray(buffDat.vao);
+   SetMaterial(0, handle.ShadeProg, handle);
    // draw!
-   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, idxBuffObj);
-   glDrawElements(GL_TRIANGLES, numFaces, GL_UNSIGNED_INT, 0);
-   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+   glDrawElements(GL_TRIANGLES, buffDat.numFaces, GL_UNSIGNED_INT, 0);
 
    //clean up
-   safe_glDisableVertexAttribArray(__h_aPosition);
-   safe_glDisableVertexAttribArray(__h_aUV);
-   safe_glDisableVertexAttribArray(__h_aNormal);
 }
 
 void GameObject::update(double timeStep) {
    if (!grounded && gravityAffected && timeStep > 0) {
-      state.velocity += vec3(0.0, -20.0, 0.0);
+      model.state.velocity += vec3(0.0, -20.0, 0.0);
    }
-   vec3 mov = state.velocity * (float)timeStep;
+   vec3 mov = model.state.velocity * (float)timeStep;
    trans(mov.x,mov.y,mov.z);
 }
 #endif
