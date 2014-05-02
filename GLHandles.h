@@ -9,6 +9,7 @@
 #ifndef ___76_Lab1__GLHandles__
 #define ___76_Lab1__GLHandles__
 
+#include <stdio.h>
 #include <iostream>
 
 #ifdef __APPLE__
@@ -42,6 +43,12 @@ class GLHandles
 
       GLHandles()
       {
+      }
+
+      void print() {
+         printf("sp:%i, p:%i, n:%i, uv:%i, t:%i, mm:%i, vm:%i, pm:%i, nm:%i, lp:%i, lc:%i, ep:%i, ma:%i, md:%i, msp:%i, msh:%i\n",
+               aPosition,aNormal,aUV,uTexUnit,uModelMatrix,uViewMatrix,uProjMatrix,
+               uNormMatrix,uLightPos,uLightColor,uEyePos,uMatAmb,uMatDif,uMatSpec,uMatShine);
       }
 };
 

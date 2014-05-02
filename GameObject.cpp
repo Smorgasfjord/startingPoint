@@ -196,7 +196,7 @@ void GameObject::initialize(GameModel *model, int modIdx, int collGroup, GLHandl
 void GameObject::draw() {
    int i;
    glUseProgram(handles.ShadeProg);
-
+//   printf("%i %i %i %i %i %i %i %i %i %i %i\n",handle
    model.render(handles, mat4(1.0f));
 }
 
@@ -223,7 +223,6 @@ void ObjectMesh::render(GLHandles handle) {
    SetMaterial(0, handle.ShadeProg, handle);
    // draw!
    glDrawElements(GL_TRIANGLES, buffDat.numFaces, GL_UNSIGNED_INT, 0);
-
    //clean up
 }
 

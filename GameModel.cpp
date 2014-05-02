@@ -269,19 +269,19 @@ ModelNode genModel(const aiScene *sc, std::vector<MeshBufferData> meshData) {
    return mod;
 }
 
-GameModel loadModel(std::string fName) {
+GameModel loadModel(std::string fName, GLHandles handle) {
    aiVector3D min, max, center;
    GameModel mod = GameModel(fName);
    if (!Import3DFromFile(fName,&min,&max,&center)) {
       return GameModel();
    }
    //LoadGLTextures(scene);
-   mod.meshData = genVAOsAndUniformBuffer(scene);
+   mod.meshData = genVAOsAndUniformBuffer(scene, handle);
    mod.rootNode = genModel(scene, mod.meshData);
    return mod;
 }
 
-std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc) {
+std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc, GLHandles handle) {
 
    std::vector<MeshBufferData> myMeshes;
    MeshBufferData aMesh;
@@ -322,8 +322,8 @@ std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc) {
          glGenBuffers(1, &buffer);
          glBindBuffer(GL_ARRAY_BUFFER, buffer);
          glBufferData(GL_ARRAY_BUFFER, sizeof(float)*3*mesh->mNumVertices, mesh->mVertices, GL_STATIC_DRAW);
-         glEnableVertexAttribArray(vertexLoc);
-         glVertexAttribPointer(vertexLoc, 3, GL_FLOAT, 0, 0, 0);
+         glEnableVertexAttribArray(handle.aPosition);
+         glVertexAttribPointer(handle.aPosition, 3, GL_FLOAT, 0, 0, 0);
       }
 
       // buffer for vertex normals
@@ -331,8 +331,8 @@ std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc) {
          glGenBuffers(1, &buffer);
          glBindBuffer(GL_ARRAY_BUFFER, buffer);
          glBufferData(GL_ARRAY_BUFFER, sizeof(float)*3*mesh->mNumVertices, mesh->mNormals, GL_STATIC_DRAW);
-         glEnableVertexAttribArray(normalLoc);
-         glVertexAttribPointer(normalLoc, 3, GL_FLOAT, 0, 0, 0);
+         glEnableVertexAttribArray(handle.aNormal);
+         glVertexAttribPointer(handle.aNormal, 3, GL_FLOAT, 0, 0, 0);
       }
 
       // buffer for vertex texture coordinates
@@ -347,8 +347,8 @@ std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc) {
          glGenBuffers(1, &buffer);
          glBindBuffer(GL_ARRAY_BUFFER, buffer);
          glBufferData(GL_ARRAY_BUFFER, sizeof(float)*2*mesh->mNumVertices, texCoords, GL_STATIC_DRAW);
-         glEnableVertexAttribArray(texCoordLoc);
-         glVertexAttribPointer(texCoordLoc, 2, GL_FLOAT, 0, 0, 0);
+         glEnableVertexAttribArray(handle.aUV);
+         glVertexAttribPointer(handle.aUV, 2, GL_FLOAT, 0, 0, 0);
       }
 
       // unbind buffers

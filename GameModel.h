@@ -61,6 +61,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "GLHandles.h"
 
 
 // Information to render each assimp node
@@ -146,7 +147,7 @@ void set_float4(float f[4], float a, float b, float c, float d);
 void color4_to_float4(const aiColor4D *c, float f[4]);
 
 
-std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc); 
+std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc, GLHandles handle); 
 
 class ModelMesh {
    public:
@@ -207,6 +208,6 @@ class GameModel {
 };
 
 ModelNode genModel(const aiScene *sc, std::vector<MeshBufferData> meshData);
-GameModel loadModel(std::string fName);
+GameModel loadModel(std::string fName, GLHandles handle);
 
 #endif
