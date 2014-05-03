@@ -120,7 +120,7 @@ int InitObj(int model, int material, int tex, string name, float mass, int cG) {
    GameObject obj;
    obj = GameObject(name);
    obj.initialize(&Models[model],model,cG,handles);
-   obj.setPhysProps(mass,1);
+   obj.setPhysProps(mass,0);
    Objects.push_back(obj);
    return Objects.size() - 1;
 }
@@ -228,7 +228,7 @@ void LoadMesh(string fName) {
 
 void LoadModel(string fName) {
    GameModel mod;
-   mod = loadModel(fName);
+   mod = loadModel(fName, handles);
    Models.push_back(mod);
 
 }
@@ -248,10 +248,10 @@ void InitGeom() {
    //rotateObj(3,0,-90.0f,0.0f);
    //lightx = lighty = 10.0f;
    //scaleObj(5,0.5,0.5,0.5f);
-   //scaleObj(0,1.0,2.0,1.0f);
+   scaleObj(0,50.0,50.0,50.0f);
    //rotateObj(4,90.0f,0.0f,90.0f);
    //transObj(0,eyePos.x,eyePos.y,eyePos.z);
-   transObj(PLAYER,0.0,2.5,0.0f);
+   //transObj(PLAYER,0.0,2.5,0.0f);
    lookAtPoint = Objects[0].pos();
    //transObj(1,lightx,lighty,0.0);
    //transObj(5,0.0,5.5,0.0f);
@@ -293,6 +293,7 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
    GLuint VS; //handles to shader object
    GLuint FS; //handles to frag shader object
    GLint vCompiled, fCompiled, linked; //status of shader
+   glewExperimental = GL_TRUE;
    GLenum err = glewInit();
    if (GLEW_OK != err)
    {
@@ -333,7 +334,15 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
    glAttachShader(ShadeProg, VS);
    glAttachShader(ShadeProg, FS);
    cout << "Attached\n";
+
+   glBindFragDataLocation(ShadeProg, 0, "owtput");
+
+   glBindAttribLocation(ShadeProg,0,"aPosition");
+   glBindAttribLocation(ShadeProg,1,"aNormal");
+   glBindAttribLocation(ShadeProg,2,"aUV");
+
    glLinkProgram(ShadeProg);
+   glValidateProgram(ShadeProg);
    /* check shader status requires helper functions */
    printOpenGLError();
    glGetProgramiv(ShadeProg, GL_LINK_STATUS, &linked);
@@ -359,7 +368,7 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
    handles.uMatDif = safe_glGetUniformLocation(ShadeProg, "uMat.dColor");
    handles.uMatSpec = safe_glGetUniformLocation(ShadeProg, "uMat.sColor");
    handles.uMatShine = safe_glGetUniformLocation(ShadeProg, "uMat.shine");
-
+   handles.print();
    printf("sucessfully installed shader %d\n", ShadeProg);
    return 1;
 }
@@ -577,16 +586,7 @@ int main( int argc, char *argv[] ) {
       exit(EXIT_FAILURE);
    }
    glfwMakeContextCurrent(window);
-glewExperimental = GL_TRUE; 
-glewInit();
-   if( !GLEW_VERSION_3_3 )
-{
-    fprintf(stderr, "Insuffcient GL version!%s\n", glGetString(GL_VERSION));
-    return -1;
-}
 
-   //test the openGL version
-   getGLversion();
    //install the shader
    if (!InstallShader(textFileRead((char *)"Rendering/Lab1_vert.glsl"), textFileRead((char *)"Rendering/Lab1_frag.glsl"),0)) {
       printf("Error installing shader!\n");
@@ -611,14 +611,13 @@ glewInit();
       inc = (int)timey;
       timey = glfwGetTime();
       mousePos = Objects[0].pos() + vec3(currPos[0], currPos[1], 0.0) * -g_Camtrans;
-      move = mousePos - Objects[HAMMER].pos();
-      Objects[HAMMER].setVelocity(move*(float)(1.0/((timey-lastTime)*2.0)));
+      //move = mousePos - Objects[HAMMER].pos();
+      //Objects[HAMMER].setVelocity(move*(float)(1.0/((timey-lastTime)*2.0)));
       Update((timey-lastTime)*2.0);
       lastTime = glfwGetTime();
       glViewport(0, 0, width, height);
       lookAtPoint = Objects[0].pos();
       eyePos = lookAtPoint + wBar * g_Camtrans;
-
       wBar = normalize(lookAtPoint-eyePos);
       uBar = normalize(cross(upVec,wBar));
       vBar = cross(wBar,uBar);
