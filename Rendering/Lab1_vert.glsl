@@ -4,30 +4,14 @@ in vec3 aNormal;
 in vec2 aUV;
  
 out vec4 vPos;
-out vec2 vTexCoord;
 out vec3 vNorm;
+out vec2 vTexCoord;
 
-
-struct Material {
-  vec3 aColor;
-  vec3 dColor;
-  vec3 sColor;
-  float shine;
-};
-
-uniform mat4 uProjMatrix;
-uniform mat4 uViewMatrix;
-uniform mat4 uModelMatrix;
-uniform mat4 uInverseTranspose;
-uniform vec3 uLightPos;
-uniform vec3 uLColor;
-uniform vec3 uCamPos;
-uniform Material uMat;
-
-uniform Matrices {    
-   mat4 projMatrix;
-   mat4 viewMatrix;
-   mat4 modelMatrix;
+layout (std140) uniform uMatrices {    
+   mat4 uProjMatrix;
+   mat4 uViewMatrix;
+   mat4 uModelMatrix;
+   mat4 uInverseTranspose;
 };
  
 void main() {

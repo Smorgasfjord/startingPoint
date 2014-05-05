@@ -26,18 +26,6 @@
 #include <GL\glut.h>
 #endif
 
-#define MAX_XPOS 2.0
-#define MAX_YPOS 2.0
-#define MIN_XPOS -2.0
-#define MIN_YPOS -2.0
-
-#define MAX_SCALE 3.0
-#define MIN_SCALE 0.25
-
-#define LIGHTIDX 0
-
-#define PI 3.14159265
-
 #include <GLFW/glfw3.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -57,6 +45,7 @@
 #include "Modeling/CMesh.h"
 #include "Platform.h"
 #include "Mountain.h"
+#include "oldTextureLoader.h"
 
 
 using namespace glm;
@@ -65,6 +54,17 @@ using namespace std;
 void transObj(int meshIdx, float x, float y, float z);
 void scaleObj(int meshIdx, float x, float y, float z);
 void rotateObj(int meshIdx, float x, float y, float z);
+
+
+
+// Uniform Bindings Points
+ GLuint matricesUniLoc = 1, materialUniLoc = 2;
+//
+// // The sampler uniform for textured models
+// // we are assuming a single texture so this will
+// //always be texture unit 0
+ GLuint texUnit = 0;
+//
 
 //flag and ID to toggle on and off the shader
 static float downPos[2], upPos[2], currPos[2], lastPos[2];
@@ -237,8 +237,9 @@ void LoadModel(string fName) {
    Change file name to load a different mesh file
 */
 void InitGeom() {
-   LoadModel("models/bjorn_hammer.dae");
+   LoadModel("models/Orange.dae");
    PLAYER = InitObj(0,2,0,"player",1.0,0);
+   InitObj(0,2,0,"moop",1.0,0);
    //GROUND = InitObj(1,0,0,"ground",0.0,2);
    //Objects[GROUND].gravityAffected = 0;
    //InitObj(0,1,0,"thing",5.0,1);
@@ -248,11 +249,12 @@ void InitGeom() {
    //rotateObj(3,0,-90.0f,0.0f);
    //lightx = lighty = 10.0f;
    //scaleObj(5,0.5,0.5,0.5f);
-   scaleObj(0,50.0,50.0,50.0f);
+   //scaleObj(0,50.0,50.0,50.0f);
    //rotateObj(4,90.0f,0.0f,90.0f);
    //transObj(0,eyePos.x,eyePos.y,eyePos.z);
    //transObj(PLAYER,0.0,2.5,0.0f);
    lookAtPoint = Objects[0].pos();
+   eyePos = lookAtPoint + vec3(0.0, 0.0, -g_Camtrans);
    //transObj(1,lightx,lighty,0.0);
    //transObj(5,0.0,5.5,0.0f);
    //Objects[5].setVelocity(vec3(0.5,0.5,0.5));
@@ -260,20 +262,26 @@ void InitGeom() {
 
 /* projection matrix */
 void SetProjectionMatrix() {
-  mat4 Projection = perspective(90.0f, (float)g_width/g_height, 0.1f, 100.f);
-  safe_glUniformMatrix4fv(handles.uProjMatrix, value_ptr(Projection));
+   mat4 Projection = perspective(90.0f, (float)g_width/g_height, 0.1f, 100.f);
+   glBindBuffer(GL_UNIFORM_BUFFER, handles.uMatricesBuff);
+   glBufferSubData(GL_UNIFORM_BUFFER, ProjMatrixOffset, MatrixSize, value_ptr(Projection));
+   glBindBuffer(GL_UNIFORM_BUFFER,0);
 }
 
 /* camera controls - do not change */
 void SetView() {
-  mat4 view = lookAt(eyePos, lookAtPoint, upVec);
-  safe_glUniformMatrix4fv(handles.uViewMatrix, value_ptr(view));
+   mat4 view = lookAt(eyePos, lookAtPoint, upVec);
+   glBindBuffer(GL_UNIFORM_BUFFER, handles.uMatricesBuff);
+   glBufferSubData(GL_UNIFORM_BUFFER, ViewMatrixOffset, MatrixSize, value_ptr(view));
+   glBindBuffer(GL_UNIFORM_BUFFER,0);
 }
 
 /* set the model transform to the identity */
 void SetModelI() {
   mat4 tmp = mat4(1.0f);
-  safe_glUniformMatrix4fv(handles.uModelMatrix, value_ptr(tmp));
+   glBindBuffer(GL_UNIFORM_BUFFER, handles.uMatricesBuff);
+   glBufferSubData(GL_UNIFORM_BUFFER, ModelMatrixOffset, MatrixSize, value_ptr(tmp));
+   glBindBuffer(GL_UNIFORM_BUFFER,0);
 }
 
 void transObj(int meshIdx, float x, float y, float z) {
@@ -293,13 +301,7 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
    GLuint VS; //handles to shader object
    GLuint FS; //handles to frag shader object
    GLint vCompiled, fCompiled, linked; //status of shader
-   glewExperimental = GL_TRUE;
-   GLenum err = glewInit();
-   if (GLEW_OK != err)
-   {
-        /* Problem: glewInit failed, something is seriously wrong. */
-        fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
-   }
+   
    cout << "Installing\n";
    VS = glCreateShader(GL_VERTEX_SHADER);
    FS = glCreateShader(GL_FRAGMENT_SHADER);
@@ -337,9 +339,11 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
 
    glBindFragDataLocation(ShadeProg, 0, "owtput");
 
-   glBindAttribLocation(ShadeProg,0,"aPosition");
+   glBindAttribLocation(ShadeProg,(GLuint)0,"aPosition");
    glBindAttribLocation(ShadeProg,1,"aNormal");
    glBindAttribLocation(ShadeProg,2,"aUV");
+
+   glBindTexture(GL_TEXTURE_2D, 0);
 
    glLinkProgram(ShadeProg);
    glValidateProgram(ShadeProg);
@@ -353,21 +357,18 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
    handles = GLHandles();
    handles.ShadeProg = ShadeProg;
    /* get handles to attribute data */
-   handles.aPosition = safe_glGetAttribLocation(ShadeProg, "aPosition");
-   handles.aNormal = safe_glGetAttribLocation(ShadeProg, "aNormal");
-   handles.aUV = safe_glGetAttribLocation(ShadeProg, "aUV");
+   handles.aPosition = (GLuint)0;//safe_glGetAttribLocation(ShadeProg, "aPosition");
+   handles.aNormal = (GLuint)1;//safe_glGetAttribLocation(ShadeProg, "aNormal");
+   handles.aUV = (GLuint)2;//safe_glGetAttribLocation(ShadeProg, "aUV");
    handles.uTexUnit = safe_glGetUniformLocation(ShadeProg, "uTexUnit");
-   handles.uProjMatrix = safe_glGetUniformLocation(ShadeProg, "uProjMatrix");
-   handles.uViewMatrix = safe_glGetUniformLocation(ShadeProg, "uViewMatrix");
-   handles.uModelMatrix = safe_glGetUniformLocation(ShadeProg, "uModelMatrix");
-   handles.uNormMatrix = safe_glGetUniformLocation(ShadeProg, "uInverseTranspose");
+   handles.uMatrices = glGetUniformBlockIndex(ShadeProg, "uMatrices");
    handles.uLightPos = safe_glGetUniformLocation(ShadeProg, "uLightPos");
    handles.uLightColor = safe_glGetUniformLocation(ShadeProg, "uLColor");
    handles.uEyePos = safe_glGetUniformLocation(ShadeProg, "uCamPos");
-   handles.uMatAmb = safe_glGetUniformLocation(ShadeProg, "uMat.aColor");
-   handles.uMatDif = safe_glGetUniformLocation(ShadeProg, "uMat.dColor");
-   handles.uMatSpec = safe_glGetUniformLocation(ShadeProg, "uMat.sColor");
-   handles.uMatShine = safe_glGetUniformLocation(ShadeProg, "uMat.shine");
+   handles.uMat = glGetUniformBlockIndex(ShadeProg, "uMat");
+   
+   glUniformBlockBinding(ShadeProg, handles.uMatrices, matricesUniLoc);
+   glUniformBlockBinding(ShadeProg, handles.uMat, materialUniLoc);
    handles.print();
    printf("sucessfully installed shader %d\n", ShadeProg);
    return 1;
@@ -383,11 +384,16 @@ void Initialize ()               // Any GL Init Code
    glDepthFunc (GL_LEQUAL);   // The Type Of Depth Testing
    glEnable (GL_DEPTH_TEST);// Enable Depth Testing
        /* texture specific settings */
-    glEnable(GL_TEXTURE_2D);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glEnable(GL_TEXTURE_2D);
+   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glGenBuffers(1,&handles.uMatricesBuff);
+   glBindBuffer(GL_UNIFORM_BUFFER, handles.uMatricesBuff);
+   glBufferData(GL_UNIFORM_BUFFER, MatricesUniBufferSize,NULL,GL_DYNAMIC_DRAW);
+   glBindBufferRange(GL_UNIFORM_BUFFER, matricesUniLoc, handles.uMatricesBuff, 0, MatricesUniBufferSize);
+   glBindBuffer(GL_UNIFORM_BUFFER,0);
 }
 
 void Update(double timeStep) {
@@ -543,7 +549,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
        default:
          temp = Objects[0].vel();
       }
-      Objects[0].setVelocity(temp*vec3(1.0,0.0,1.0));
+      Objects[0].setVelocity(temp*vec3(1.0,1.0,1.0));
       lookAtPoint = Objects[0].pos();
       eyePos = lookAtPoint + wBar * g_Camtrans;
 
@@ -586,7 +592,15 @@ int main( int argc, char *argv[] ) {
       exit(EXIT_FAILURE);
    }
    glfwMakeContextCurrent(window);
-
+   
+   glewExperimental = GL_TRUE;
+   GLenum err = glewInit();
+   if (GLEW_OK != err)
+   {
+        /* Problem: glewInit failed, something is seriously wrong. */
+        fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+   }
+   LoadTexture("Models/Dargon.bmp",0);
    //install the shader
    if (!InstallShader(textFileRead((char *)"Rendering/Lab1_vert.glsl"), textFileRead((char *)"Rendering/Lab1_frag.glsl"),0)) {
       printf("Error installing shader!\n");

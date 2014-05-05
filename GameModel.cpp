@@ -1,7 +1,6 @@
 
 #include "GameModel.h"
 
-
 // Uniform Buffer for Matrices
 // this buffer will contain 3 matrices: projection, view and model
 // each matrix is a float array with 16 components
@@ -275,7 +274,7 @@ GameModel loadModel(std::string fName, GLHandles handle) {
    if (!Import3DFromFile(fName,&min,&max,&center)) {
       return GameModel();
    }
-   //LoadGLTextures(scene);
+   LoadGLTextures();
    mod.meshData = genVAOsAndUniformBuffer(scene, handle);
    mod.rootNode = genModel(scene, mod.meshData);
    return mod;
@@ -292,8 +291,6 @@ std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc, GLHandles
    for (unsigned int n = 0; n < sc->mNumMeshes; ++n)
    {
       const aiMesh* mesh = sc->mMeshes[n];
-      glewExperimental = GL_TRUE; 
-      glewInit();
       // create array with faces
       // have to convert from Assimp format to array
       unsigned int *faceArray;
@@ -306,7 +303,7 @@ std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc, GLHandles
          memcpy(&faceArray[faceIndex], face->mIndices,3 * sizeof(unsigned int));
          faceIndex += 3;
       }
-      aMesh.numFaces = sc->mMeshes[n]->mNumFaces;
+      aMesh.numFaces = sc->mMeshes[n]->mNumFaces*3;
 
       // generate Vertex Array for mesh
       glGenVertexArrays(1,&(aMesh.vao));

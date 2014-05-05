@@ -1,23 +1,14 @@
+#include "oldTextureLoader.h"
+
+using namespace std;
+
 /*data structure for the image used for  texture mapping */
-typedef struct Image {
-  unsigned long sizeX;
-  unsigned long sizeY;
-  char *data;
-} Image;
 
 Image *TextureImage;
-
-typedef struct RGB {
-  GLubyte r;
-  GLubyte g;
-  GLubyte b;
-} RGB;
 
 RGB myimage[64][64];
 RGB* g_pixel;
 //forward declaration of image loading and texture set-up code
-int ImageLoad(char *filename, Image *image);
-GLvoid LoadTexture(char* image_file, int tex_id);
 
 //routines to load in a bmp files - must be 2^nx2^m and a 24bit bmp
 GLvoid LoadTexture(char* image_file, int texID) {
@@ -27,7 +18,7 @@ GLvoid LoadTexture(char* image_file, int texID) {
     printf("Error allocating space for image");
     exit(1);
   }
-  cout << "trying to load " << image_file << endl;
+  cout << "trying to load " << image_file << "\n";
   if (!ImageLoad(image_file, TextureImage)) {
     exit(1);
   }

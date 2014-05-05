@@ -87,20 +87,21 @@ struct MyMaterial{
 
 
 // Uniform Bindings Points
-//GLuint matricesUniLoc = 1, materialUniLoc = 2;
+///GLuint matricesUniLoc = 1, materialUniLoc = 2;
 
 // The sampler uniform for textured models
 // we are assuming a single texture so this will
 //always be texture unit 0
-//GLuint texUnit = 0;
+/////GLuint texUnit = 0;
 
 // Uniform Buffer for Matrices
 // this buffer will contain 3 matrices: projection, view and model
 // each matrix is a float array with 16 components
-#define MatricesUniBufferSize sizeof(float) * 16 * 3
+#define MatricesUniBufferSize sizeof(float) * 16 * 4
 #define ProjMatrixOffset 0
 #define ViewMatrixOffset sizeof(float) * 16
 #define ModelMatrixOffset sizeof(float) * 16 * 2
+#define NormMatrixOffset sizeof(float) * 16 * 3
 #define MatrixSize sizeof(float) * 16
 
 // the global Assimp scene object

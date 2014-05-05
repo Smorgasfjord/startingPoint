@@ -29,26 +29,20 @@ class GLHandles
       GLuint aNormal;
       GLuint aUV;
       GLuint uTexUnit;
-      GLuint uModelMatrix;
-      GLuint uViewMatrix;
-      GLuint uProjMatrix;
-      GLuint uNormMatrix;
+      GLuint uMatrices;
+      GLuint uMatricesBuff;
       GLuint uLightPos;
       GLuint uLightColor;
       GLuint uEyePos;
-      GLuint uMatAmb;
-      GLuint uMatDif;
-      GLuint uMatSpec;
-      GLuint uMatShine;
+      GLuint uMat;
 
       GLHandles()
       {
       }
 
       void print() {
-         printf("sp:%i, p:%i, n:%i, uv:%i, t:%i, mm:%i, vm:%i, pm:%i, nm:%i, lp:%i, lc:%i, ep:%i, ma:%i, md:%i, msp:%i, msh:%i\n",
-               aPosition,aNormal,aUV,uTexUnit,uModelMatrix,uViewMatrix,uProjMatrix,
-               uNormMatrix,uLightPos,uLightColor,uEyePos,uMatAmb,uMatDif,uMatSpec,uMatShine);
+         printf("sprog:%i, pos:%i, n:%i, uv:%i, tex:%i, mx%i, mxb%i, lp:%i, lc:%i, ep:%i, mat:%i\n",
+               ShadeProg, aPosition,aNormal,aUV,uTexUnit,uMatrices,uMatricesBuff,uLightPos,uLightColor,uEyePos,uMat);
       }
 };
 

@@ -5,7 +5,7 @@
 
 using namespace glm;
 
-/* helper function to set up material for shading */
+/* helper function to set up material for shading /
 void SetMaterial(int i, int ShadeProg, GLHandles handle) {
   glUseProgram(ShadeProg);
   switch (i) {
@@ -22,7 +22,7 @@ void SetMaterial(int i, int ShadeProg, GLHandles handle) {
         safe_glUniform1f(handle.uMatShine, 200.0);
         break;
     case 2:
-    /* TO DO fill in another material that is greenish */
+    / TO DO fill in another material that is greenish /
         //slime cube
         safe_glUniform3f(handle.uMatAmb, 0.1, 0.7, 0.1);
         safe_glUniform3f(handle.uMatDif, 0.3, 0.4, 0.3);
@@ -36,7 +36,7 @@ void SetMaterial(int i, int ShadeProg, GLHandles handle) {
         safe_glUniform1f(handle.uMatShine, 20.0);
         break;
   }
-}
+}*/
 
 void initGameObjState(Transform_t *state) {
    state->pos = state->orient = vec3(0.0);
@@ -196,15 +196,18 @@ void GameObject::initialize(GameModel *model, int modIdx, int collGroup, GLHandl
 void GameObject::draw() {
    int i;
    glUseProgram(handles.ShadeProg);
-//   printf("%i %i %i %i %i %i %i %i %i %i %i\n",handle
    model.render(handles, mat4(1.0f));
 }
 
 void ObjectNode::render(GLHandles handle, mat4 cumulative) {
    mat4 current = state.transform * cumulative;
-   safe_glUniformMatrix4fv(handle.uModelMatrix, glm::value_ptr(current));
-   safe_glUniformMatrix4fv(handle.uNormMatrix, 
-      glm::value_ptr(glm::transpose(glm::inverse(current))));
+   glUseProgram(handle.ShadeProg);
+   glBindBuffer(GL_UNIFORM_BUFFER,handle.uMatricesBuff);
+   glBufferSubData(GL_UNIFORM_BUFFER,
+                     ModelMatrixOffset, MatrixSize, value_ptr(current));
+   glBufferSubData(GL_UNIFORM_BUFFER, NormMatrixOffset, MatrixSize, 
+                    value_ptr(transpose(inverse(current))));
+   glBindBuffer(GL_UNIFORM_BUFFER,0);
 
    for (int i = 0; i < meshes.size(); i++) {
       meshes[i].render(handle);
@@ -219,11 +222,17 @@ void ObjectNode::render(GLHandles handle, mat4 cumulative) {
 void ObjectMesh::render(GLHandles handle) {
    //std::cout << "using buffer " << buff << "\n";
    glUseProgram(handle.ShadeProg);
+   glUniform1i(handle.uTexUnit,0);
+   //SetMaterial(0, handle.ShadeProg, handle);
+   glBindBufferRange(GL_UNIFORM_BUFFER, (GLuint)2, buffDat.uniformBlockIndex, 0, sizeof(struct MyMaterial));
+   // bind texture
+   glBindTexture(GL_TEXTURE_2D, buffDat.texIndex);
+
    glBindVertexArray(buffDat.vao);
-   SetMaterial(0, handle.ShadeProg, handle);
    // draw!
    glDrawElements(GL_TRIANGLES, buffDat.numFaces, GL_UNSIGNED_INT, 0);
    //clean up
+   glBindVertexArray(0);
 }
 
 void GameObject::update(double timeStep) {
