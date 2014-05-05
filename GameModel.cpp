@@ -122,7 +122,7 @@ bool Import3DFromFile( const std::string& pFile, aiVector3D *min, aiVector3D *ma
       return false;
    }
    // Now we can access the file's contents.
-   printf("Import of scene %s succeeded.",pFile.c_str());
+   printf("Import of scene %s succeeded.\n",pFile.c_str());
 
    aiVector3D scene_min, scene_max, scene_center;
    get_bounding_box(min, max);
@@ -285,6 +285,8 @@ std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc, GLHandles
    std::vector<MeshBufferData> myMeshes;
    MeshBufferData aMesh;
    struct MyMaterial aMat;
+   GLsizei stride = (3 + 3 + 2) * sizeof(float);
+   float *firstComp = 0;
    GLuint buffer;
 
    // For each mesh
@@ -297,6 +299,7 @@ std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc, GLHandles
       faceArray = (unsigned int *)malloc(sizeof(unsigned int) * mesh->mNumFaces * 3);
       unsigned int faceIndex = 0;
 
+      firstComp = 0;
       for (unsigned int t = 0; t < mesh->mNumFaces; ++t) {
          const aiFace* face = &mesh->mFaces[t];
 
@@ -317,19 +320,22 @@ std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc, GLHandles
       // buffer for vertex positions
       if (mesh->HasPositions()) {
          glGenBuffers(1, &buffer);
+         glEnableVertexAttribArray(handle.aPosition);
          glBindBuffer(GL_ARRAY_BUFFER, buffer);
          glBufferData(GL_ARRAY_BUFFER, sizeof(float)*3*mesh->mNumVertices, mesh->mVertices, GL_STATIC_DRAW);
-         glEnableVertexAttribArray(handle.aPosition);
-         glVertexAttribPointer(handle.aPosition, 3, GL_FLOAT, 0, 0, 0);
+         glVertexAttribPointer(handle.aPosition, 3, GL_FLOAT, GL_FALSE, stride, (const GLvoid*)firstComp);
+         firstComp += 3;
+         std::cout << firstComp << "\n";
       }
 
       // buffer for vertex normals
       if (mesh->HasNormals()) {
          glGenBuffers(1, &buffer);
+         glEnableVertexAttribArray(handle.aNormal);
          glBindBuffer(GL_ARRAY_BUFFER, buffer);
          glBufferData(GL_ARRAY_BUFFER, sizeof(float)*3*mesh->mNumVertices, mesh->mNormals, GL_STATIC_DRAW);
-         glEnableVertexAttribArray(handle.aNormal);
-         glVertexAttribPointer(handle.aNormal, 3, GL_FLOAT, 0, 0, 0);
+         glVertexAttribPointer(handle.aNormal, 3, GL_FLOAT, GL_FALSE, stride, (const GLvoid*)firstComp);
+         firstComp += 3;
       }
 
       // buffer for vertex texture coordinates
@@ -342,10 +348,10 @@ std::vector<MeshBufferData> genVAOsAndUniformBuffer(const aiScene *sc, GLHandles
 
          }
          glGenBuffers(1, &buffer);
+         glEnableVertexAttribArray(handle.aUV);
          glBindBuffer(GL_ARRAY_BUFFER, buffer);
          glBufferData(GL_ARRAY_BUFFER, sizeof(float)*2*mesh->mNumVertices, texCoords, GL_STATIC_DRAW);
-         glEnableVertexAttribArray(handle.aUV);
-         glVertexAttribPointer(handle.aUV, 2, GL_FLOAT, 0, 0, 0);
+         glVertexAttribPointer(handle.aUV, 2, GL_FLOAT, GL_FALSE, stride, (const GLvoid*)firstComp);
       }
 
       // unbind buffers

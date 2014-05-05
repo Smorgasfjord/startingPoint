@@ -229,8 +229,10 @@ void ObjectMesh::render(GLHandles handle) {
    glBindTexture(GL_TEXTURE_2D, buffDat.texIndex);
 
    glBindVertexArray(buffDat.vao);
+   cout << buffDat.vao << "\n";
    // draw!
    glDrawElements(GL_TRIANGLES, buffDat.numFaces, GL_UNSIGNED_INT, 0);
+   //glDrawArrays(GL_TRIANGLES, 0, buffDat.numFaces);
    //clean up
    glBindVertexArray(0);
 }

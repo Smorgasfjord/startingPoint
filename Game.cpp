@@ -76,6 +76,7 @@ static float g_width, g_height;
 static float phi = 0, theta = 0;
 float lightx, lighty, lightz;
 
+
 float g_Camtrans = -6.0;
 vec3 wBar;
 vec3 uBar;
@@ -238,12 +239,13 @@ void LoadModel(string fName) {
 */
 void InitGeom() {
    LoadModel("models/Orange.dae");
+   LoadModel("models/bjorn_hammer.dae");
    PLAYER = InitObj(0,2,0,"player",1.0,0);
    InitObj(0,2,0,"moop",1.0,0);
    //GROUND = InitObj(1,0,0,"ground",0.0,2);
    //Objects[GROUND].gravityAffected = 0;
    //InitObj(0,1,0,"thing",5.0,1);
-   //HAMMER = InitObj(3,1,0,"hommer",5.0,0);
+   HAMMER = InitObj(1,1,0,"hommer",5.0,0);
    
    //Positions[3] = vec3(0,0,25.0f);
    //rotateObj(3,0,-90.0f,0.0f);
@@ -343,8 +345,6 @@ int InstallShader(const GLchar *vShaderName, const GLchar *fShaderName, int prog
    glBindAttribLocation(ShadeProg,1,"aNormal");
    glBindAttribLocation(ShadeProg,2,"aUV");
 
-   glBindTexture(GL_TEXTURE_2D, 0);
-
    glLinkProgram(ShadeProg);
    glValidateProgram(ShadeProg);
    /* check shader status requires helper functions */
@@ -431,7 +431,7 @@ void Draw (void)
    glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
    //Start our shader   
-   glUseProgram(ShadeProg);
+   glUseProgram(handles.ShadeProg);
 
    /* only set the projection and view matrix once */
    SetProjectionMatrix();
@@ -576,6 +576,7 @@ int main( int argc, char *argv[] ) {
    GLFWwindow* window;
    int width, height, inc, obj;
    char title[256];
+   char texture[] = "Models/Dargon.bmp";
  
    worl = ChunkWorld(50,50,50);
 
@@ -600,13 +601,13 @@ int main( int argc, char *argv[] ) {
         /* Problem: glewInit failed, something is seriously wrong. */
         fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
    }
-   LoadTexture("Models/Dargon.bmp",0);
+   //LoadTexture(texture,0);
    //install the shader
    if (!InstallShader(textFileRead((char *)"Rendering/Lab1_vert.glsl"), textFileRead((char *)"Rendering/Lab1_frag.glsl"),0)) {
       printf("Error installing shader!\n");
       return 0;
    }
-    Initialize();
+   Initialize();
    InitGeom();
    glfwSetKeyCallback(window, key_callback);
    glfwSetCursorPosCallback(window, Martian);
@@ -625,8 +626,8 @@ int main( int argc, char *argv[] ) {
       inc = (int)timey;
       timey = glfwGetTime();
       mousePos = Objects[0].pos() + vec3(currPos[0], currPos[1], 0.0) * -g_Camtrans;
-      //move = mousePos - Objects[HAMMER].pos();
-      //Objects[HAMMER].setVelocity(move*(float)(1.0/((timey-lastTime)*2.0)));
+      move = mousePos - Objects[HAMMER].pos();
+      Objects[HAMMER].setVelocity(move*(float)(1.0/((timey-lastTime)*2.0)));
       Update((timey-lastTime)*2.0);
       lastTime = glfwGetTime();
       glViewport(0, 0, width, height);
