@@ -46,7 +46,7 @@
 #include <IL/il.h>
 
 // include GLEW to access OpenGL 3.3 functions
-#include <GL/glew.h>
+#include <GL\glew.h>
 
 // assimp include files. These three are usually needed.
 #include <assimp/Importer.hpp>   //OO version Header!

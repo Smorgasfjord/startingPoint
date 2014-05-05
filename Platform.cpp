@@ -14,9 +14,16 @@
 #include "glm/gtc/matrix_transform.hpp" //perspective, trans etc
 #include "glm/gtc/type_ptr.hpp" //value_ptr
 #include "GLSL_helper.h"
-#include <sys/time.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifdef __WIN32__
+#incldue <time.h>
+#endif
+#ifdef __APPLE__
+#include <sys/time.h>
+#endif
+
 
 Platform::Platform()
 {

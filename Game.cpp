@@ -23,7 +23,6 @@
 #pragma comment(lib, "glew32.lib")
 
 #include <GL\glew.h>
-#include <GL\glut.h>
 #endif
 
 #include <GLFW/glfw3.h>

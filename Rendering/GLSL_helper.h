@@ -20,6 +20,11 @@
 #include <GLFW/glfw3.h>
 #endif
 
+#ifdef __WIN32__
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
